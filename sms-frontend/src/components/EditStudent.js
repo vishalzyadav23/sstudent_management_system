@@ -3,68 +3,63 @@ import axios from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
 
 function EditStudent() {
-  const { id } = useParams(); // Grabs the student ID from the URL
-  const navigate = useNavigate();
-  
-  // State to hold the student data
   const [student, setStudent] = useState({
-    name: '', rollNumber: '', email: '', phoneNumber: '', department: '', academicYear: '', address: ''
+    name: '', rollNumber: '', email: '', department: '', academicYear: '', address: ''
   });
+  const navigate = useNavigate();
+  const { id } = useParams();
 
-  // 1. VIEWING ONE STUDENT'S DETAILS (Runs when the page opens)
   useEffect(() => {
-    axios.get(`http://localhost:8080/api/students/${id}`)
-      .then(response => {
-        setStudent(response.data); // Fills the form with the existing data
-      })
-      .catch(error => console.error(error));
+    // 1. Grab token to view the data
+    const token = localStorage.getItem('jwtToken');
+
+    axios.get(`http://localhost:8080/api/students/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      // --- PHASE 1 FIX: Adding .data to read the new ApiResponse wrapper ---
+      .then(response => setStudent(response.data.data))
+      .catch(error => console.error("Error fetching student:", error));
   }, [id]);
 
-  // Handle typing in the input boxes
-  const handleChange = (e) => {
-    setStudent({ ...student, [e.target.name]: e.target.value });
-  };
-
-  // 2. UPDATING STUDENT INFORMATION (Runs when you click Save)
   const handleSubmit = (e) => {
     e.preventDefault();
-    axios.put(`http://localhost:8080/api/students/${id}`, student)
-      .then(response => {
-        alert("Student Updated Successfully!");
-        navigate('/'); // Go back to the main list
-      })
-      .catch(error => console.error(error));
+    
+    // 2. Grab token to save the changes
+    const token = localStorage.getItem('jwtToken');
+
+    axios.put(`http://localhost:8080/api/students/${id}`, student, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(() => navigate('/dashboard'))
+      .catch(error => {
+        console.error("Error updating student:", error);
+        alert("Failed to update. The Bouncer blocked you! Are you logged in as Admin?");
+      });
   };
 
   return (
-    <div>
-      <h2>Edit Student Details</h2>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', width: '300px', gap: '10px' }}>
-        <label>Name:</label>
-        <input type="text" name="name" value={student.name} onChange={handleChange} required />
-        
-        <label>Roll Number:</label>
-        <input type="text" name="rollNumber" value={student.rollNumber} onChange={handleChange} required />
-        
-        <label>Email:</label>
-        <input type="email" name="email" value={student.email} onChange={handleChange} required />
-        
-        <label>Phone Number:</label>
-        <input type="text" name="phoneNumber" value={student.phoneNumber} onChange={handleChange} />
-        
-        <label>Department:</label>
-        <input type="text" name="department" value={student.department} onChange={handleChange} />
-        
-        <label>Academic Year:</label>
-        <input type="text" name="academicYear" value={student.academicYear} onChange={handleChange} />
-        
-        <label>Address:</label>
-        <input type="text" name="address" value={student.address} onChange={handleChange} />
-        
-        <button type="submit" style={{ padding: '10px', backgroundColor: '#2196F3', color: 'white', cursor: 'pointer', border: 'none' }}>
-          Update Student
-        </button>
-      </form>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '40px' }}>
+      <div style={{ padding: '30px', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', width: '500px' }}>
+        <h2 style={{ color: '#f59e0b', textAlign: 'center', marginBottom: '20px' }}>Edit Student</h2>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          <input type="text" placeholder="Name" value={student.name} onChange={(e) => setStudent({...student, name: e.target.value})} className="custom-input" required />
+          <input type="text" placeholder="Roll Number" value={student.rollNumber} onChange={(e) => setStudent({...student, rollNumber: e.target.value})} className="custom-input" required />
+          <input type="email" placeholder="Email" value={student.email} onChange={(e) => setStudent({...student, email: e.target.value})} className="custom-input" required />
+          
+          <select value={student.department} onChange={(e) => setStudent({...student, department: e.target.value})} className="custom-input" required>
+            <option value="">Select Department</option>
+            <option value="CS">Computer Science</option>
+            <option value="IT">Information Technology</option>
+            <option value="EC">Electronics</option>
+            <option value="Mechanical">Mechanical</option>
+          </select>
+          
+          <input type="text" placeholder="Academic Year" value={student.academicYear} onChange={(e) => setStudent({...student, academicYear: e.target.value})} className="custom-input" required />
+          <input type="text" placeholder="Address" value={student.address} onChange={(e) => setStudent({...student, address: e.target.value})} className="custom-input" required />
+          
+          <button type="submit" className="btn btn-update" style={{ padding: '12px', marginTop: '10px' }}>Update Student</button>
+        </form>
+      </div>
     </div>
   );
 }

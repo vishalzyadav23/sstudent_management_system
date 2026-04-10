@@ -1,177 +1,221 @@
-/* --- GLOBAL DASHBOARD STYLES --- */
+/* --- iOS SYSTEM DESIGN SYSTEM (SF Pro Feel) --- */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --system-blue: #007aff;
+  --system-red: #ff3b30;
+  --system-gray: #8e8e93;
+  /* Apple's Glass Material */
+  --ios-glass: rgba(255, 255, 255, 0.45);
+  --ios-border: rgba(255, 255, 255, 0.3);
+}
+
 body {
-  background-color: #f3f4f6;
-  /* Soft light gray background */
-  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   margin: 0;
-  padding: 0;
-  color: #1f2937;
+  /* iOS System Font Stack */
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "Helvetica Neue", sans-serif;
+  color: #000;
+  min-height: 100vh;
+  overflow-x: hidden;
+
+  /* --- iOS 18 MESH GRADIENT (Soft & Dynamic) --- */
+  background-color: #f2f2f7;
+  /* iOS System Background Gray */
+  background-image:
+    radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.15) 0px, transparent 45%),
+    radial-gradient(at 100% 0%, rgba(255, 59, 48, 0.08) 0px, transparent 45%),
+    radial-gradient(at 50% 50%, rgba(88, 86, 214, 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
 .dashboard-container {
-  max-width: 1200px;
-  margin: 40px auto;
-  padding: 30px;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  max-width: 1000px;
+  /* Slimmer for that mobile-first look */
+  margin: 0 auto;
+  padding: 40px 20px;
+  /* Smooth Slide-up like an iOS App opening */
+  animation: appLaunch 0.6s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* --- NAVIGATION --- */
+@keyframes appLaunch {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* --- iOS BLURRED NAVIGATION BAR --- */
 .navbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #e5e7eb;
-  margin-bottom: 30px;
+  background: var(--ios-glass);
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  padding: 12px 24px;
+  border-radius: 22px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--ios-border);
+  margin-bottom: 40px;
+  position: sticky;
+  top: 20px;
+  z-index: 1000;
 }
 
 .navbar h1 {
   margin: 0;
-  color: #111827;
-  font-size: 28px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #1d1d1f;
 }
 
-.nav-links a {
-  text-decoration: none;
-  color: #4f46e5;
-  font-weight: 600;
-  margin-left: 20px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.nav-links a:hover {
-  background-color: #e0e7ff;
-}
-
-/* --- CONTROL PANEL (Search/Filter) --- */
-.control-panel {
-  display: flex;
-  gap: 15px;
-  background-color: #f9fafb;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 25px;
-  border: 1px solid #e5e7eb;
-}
-
-.custom-input,
-.custom-select {
-  padding: 10px 15px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  outline: none;
-  font-size: 14px;
-  width: 250px;
-  transition: border-color 0.2s;
-}
-
-.custom-input:focus,
-.custom-select:focus {
-  border-color: #4f46e5;
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-}
-
-/* --- THE TABLE --- */
-.custom-table {
-  width: 100%;
-  border-collapse: collapse;
-  border-radius: 8px;
-  overflow: hidden;
-  /* Keeps the rounded corners on the header */
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.custom-table th {
-  background-color: #4f46e5;
-  color: white;
-  padding: 15px;
-  text-align: left;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-.custom-table th:hover {
-  background-color: #4338ca;
-}
-
-.custom-table td {
-  padding: 15px;
-  border-bottom: 1px solid #e5e7eb;
-  background-color: white;
-}
-
-.custom-table tbody tr:hover td {
-  background-color: #f9fafb;
-}
-
-/* --- BUTTONS --- */
+/* --- iOS "SQUISHY" BUTTONS --- */
 .btn {
-  padding: 8px 16px;
   border: none;
-  border-radius: 6px;
-  cursor: pointer;
+  padding: 10px 20px;
+  border-radius: 18px;
+  /* High roundness */
   font-weight: 600;
-  color: white;
-  transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:active {
+  transform: scale(0.93);
+  /* The Apple "Press" feel */
+  filter: brightness(0.9);
 }
 
 .btn-add {
-  background-color: #10b981;
-}
-
-.btn-add:hover {
-  background-color: #059669;
-  transform: translateY(-1px);
-}
-
-.btn-edit {
-  background-color: #3b82f6;
-  margin-right: 10px;
-}
-
-.btn-edit:hover {
-  background-color: #2563eb;
-  transform: translateY(-1px);
-}
-
-.btn-delete {
-  background-color: #ef4444;
-}
-
-.btn-delete:hover {
-  background-color: #dc2626;
-  transform: translateY(-1px);
-}
-
-/* --- PAGINATION --- */
-.pagination-controls {
-  margin-top: 25px;
-  display: flex;
-  gap: 15px;
-  justify-content: center;
-  align-items: center;
-  font-weight: 600;
-}
-
-.btn-page {
-  background-color: white;
-  color: #4f46e5;
-  border: 1px solid #4f46e5;
-}
-
-.btn-page:hover:not(:disabled) {
-  background-color: #4f46e5;
+  background: var(--system-blue);
   color: white;
 }
 
-.btn-page:disabled {
-  border-color: #d1d5db;
-  color: #9ca3af;
-  box-shadow: none;
-  cursor: not-allowed;
+.btn-edit {
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--system-blue);
+}
+
+.btn-delete {
+  background: rgba(255, 59, 48, 0.1);
+  color: var(--system-red);
+}
+
+/* --- iOS INPUTS --- */
+.custom-input,
+.custom-select {
+  padding: 12px 18px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  /* Light translucent gray */
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 16px;
+  /* Native iOS size */
+  transition: background 0.2s ease;
+}
+
+.custom-input:focus {
+  background: rgba(0, 0, 0, 0.06);
+  outline: 2px solid var(--system-blue);
+}
+
+/* --- iOS LIST / TABLE (Stacking Cards Style) --- */
+.custom-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--ios-glass);
+  backdrop-filter: blur(25px) saturate(180%);
+  border-radius: 24px;
+  border: 1px solid var(--ios-border);
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+}
+
+.custom-table th {
+  padding: 18px 20px;
+  color: var(--system-gray);
+  font-size: 13px;
+  text-transform: none;
+  /* iOS uses Sentence case */
+  font-weight: 600;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.custom-table td {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.custom-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.custom-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.custom-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* --- iOS PILL BADGES --- */
+.dept-badge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dept-it,
+.dept-cs {
+  background: rgba(52, 199, 89, 0.15);
+  color: #248a3d;
+}
+
+.dept-mechanical {
+  background: rgba(255, 159, 10, 0.15);
+  color: #c97500;
+}
+
+.dept-ec {
+  background: rgba(88, 86, 214, 0.15);
+  color: #5856d6;
+}
+
+/* --- PERFORMANCE: YEAR GRID --- */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+/* --- ANIMATION: iOS SLIDE --- */
+tbody tr {
+  animation: iosSlideIn 0.4s ease-out backwards;
+}
+
+@keyframes iosSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
