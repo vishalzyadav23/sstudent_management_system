@@ -19,14 +19,30 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 
-  /* --- iOS 18 MESH GRADIENT (Soft & Dynamic) --- */
-  background-color: #f2f2f7;
-  /* iOS System Background Gray */
+  /* --- PREMIUM GRID & GLOW THEME --- */
+  background-color: #f8fafc;
   background-image:
-    radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.15) 0px, transparent 45%),
-    radial-gradient(at 100% 0%, rgba(255, 59, 48, 0.08) 0px, transparent 45%),
-    radial-gradient(at 50% 50%, rgba(88, 86, 214, 0.1) 0px, transparent 50%);
+    /* The subtle dotted grid */
+    radial-gradient(circle at center, #cbd5e1 1.5px, transparent 1.5px),
+    /* The glowing color orbs */
+    radial-gradient(at 0% 0%, rgba(0, 122, 255, 0.18) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(88, 86, 214, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 45, 85, 0.1) 0px, transparent 50%);
+  background-size: 24px 24px, 100% 100%, 100% 100%, 100% 100%;
   background-attachment: fixed;
+
+  /* Smooth, slow color shift animation */
+  animation: themeShift 15s ease-in-out infinite alternate;
+}
+
+@keyframes themeShift {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+
+  100% {
+    filter: hue-rotate(25deg);
+  }
 }
 
 .dashboard-container {
