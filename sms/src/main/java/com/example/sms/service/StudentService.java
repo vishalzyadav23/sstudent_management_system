@@ -1,11 +1,14 @@
 package com.example.sms.service;
 
 import com.example.sms.entity.Student;
+import com.example.sms.repository.AttendanceRepository;
+import com.example.sms.repository.EnrollmentRepository;
+import com.example.sms.repository.MarksRepository;
 import com.example.sms.repository.StudentRepository;
 import com.example.sms.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // <-- Added this import
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,6 +21,16 @@ public class StudentService {
     @Autowired
     private UserRepository userRepository;
 
+    // --- NEW ERP REPOSITORIES FOR CLEANUP ---
+    @Autowired
+    private EnrollmentRepository enrollmentRepository;
+
+    @Autowired
+    private MarksRepository marksRepository;
+
+    @Autowired
+    private AttendanceRepository attendanceRepository;
+
     public Student addStudent(Student student) {
         return repo.save(student);
     }
@@ -26,7 +39,6 @@ public class StudentService {
         return repo.findAll();
     }
 
-    // --- NEW METHODS ---
     public Student getStudentById(Long id) {
         return repo.findById(id).orElseThrow(() -> new RuntimeException("Student not found"));
     }
@@ -58,20 +70,33 @@ public class StudentService {
         return repo.save(student);
     }
 
-    @Transactional // <-- CRITICAL: Ensures both deletes happen as one unit
+    @Transactional // <-- CRITICAL: Ensures all deletes happen as one unit
     public void deleteStudent(Long id) {
         // 1. Get the exact student object
         Student student = repo.findById(id).orElseThrow(() -> new RuntimeException("Student not found"));
 
-        // 2. Find the linked User account using the exact Student object
+        // 2. Safely delete all Grades/Marks linked to this student
+        marksRepository.findByStudentId(id).forEach(mark -> marksRepository.delete(mark));
+
+        // 3. Safely delete all Attendance records linked to this student
+        attendanceRepository.findByStudentId(id).forEach(attendance -> attendanceRepository.delete(attendance));
+
+        // 4. Safely delete all Class Enrollments linked to this student
+        enrollmentRepository.findByStudentId(id).forEach(enrollment -> enrollmentRepository.delete(enrollment));
+
+        // 5. Find the linked User account using the exact Student object and delete it
         userRepository.findByStudent(student).ifPresent(user -> {
             userRepository.delete(user);
         });
 
-        // 3. FORCE the database to execute the user deletion RIGHT NOW
+        // 6. FORCE the database to execute all deletions RIGHT NOW to clear constraints
+        marksRepository.flush();
+        attendanceRepository.flush();
+        enrollmentRepository.flush();
         userRepository.flush();
 
-        // 4. Now it is 100% safe to delete the student
+        // 7. Now it is 100% safe to delete the student profile without throwing a 500
+        // error
         repo.deleteById(id);
     }
 }
