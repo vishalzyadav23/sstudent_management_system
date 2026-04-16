@@ -4,7 +4,7 @@ import com.example.sms.entity.Course;
 import com.example.sms.entity.Enrollment;
 import com.example.sms.entity.Faculty;
 import com.example.sms.entity.Marks;
-import com.example.sms.entity.Attendance; // <-- Added Attendance Entity
+import com.example.sms.entity.Attendance;
 import com.example.sms.service.*;
 import com.example.sms.repository.StudentRepository;
 import com.example.sms.repository.CourseRepository;
@@ -30,8 +30,8 @@ public class ErpController {
     private EnrollmentService enrollmentService;
     @Autowired
     private MarksService marksService;
-    @Autowired
-    private AttendanceService attendanceService;
+
+    // (Removed unused attendanceService to clear the yellow warning)
 
     // --- REPOSITORIES ADDED FOR QUICK DATA ENTRY ---
     @Autowired
@@ -122,17 +122,21 @@ public class ErpController {
         try {
             Long studentId = ((Number) payload.get("studentId")).longValue();
             Long courseId = ((Number) payload.get("courseId")).longValue();
-            int internal = ((Number) payload.get("internalMarks")).intValue();
-            int semester = ((Number) payload.get("semesterMarks")).intValue();
 
-            // Auto-calculate total and grade
-            int total = internal + semester;
+            // FIXED: Changed from .intValue() to .doubleValue() to match your Marks entity
+            Double internal = ((Number) payload.get("internalMarks")).doubleValue();
+            Double semester = ((Number) payload.get("semesterMarks")).doubleValue();
+
+            // Auto-calculate total and grade using Double
+            Double total = internal + semester;
             String grade = total >= 90 ? "A+"
                     : total >= 80 ? "A" : total >= 70 ? "B" : total >= 60 ? "C" : total >= 50 ? "D" : "F";
 
             Marks marks = new Marks();
             marks.setStudent(studentRepo.findById(studentId).get());
             marks.setCourse(courseRepo.findById(courseId).get());
+
+            // FIXED: These now pass Double values correctly
             marks.setInternalMarks(internal);
             marks.setSemesterMarks(semester);
             marks.setTotalMarks(total);
@@ -165,5 +169,21 @@ public class ErpController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("{\"error\": \"Failed to log attendance.\"}");
         }
+    }
+
+    // ==========================================
+    // --- NEW: ADMIN QUICK VIEW APIs ---
+    // ==========================================
+
+    // --- NEW: Fetch specific student Marks for the Admin Dashboard ---
+    @GetMapping("/marks/student/{id}")
+    public ResponseEntity<?> getMarksForStudent(@PathVariable Long id) {
+        return ResponseEntity.ok(marksRepo.findByStudentId(id));
+    }
+
+    // --- NEW: Fetch specific student Attendance for the Admin Dashboard ---
+    @GetMapping("/attendance/student/{id}")
+    public ResponseEntity<?> getAttendanceForStudent(@PathVariable Long id) {
+        return ResponseEntity.ok(attendanceRepo.findByStudentId(id));
     }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -12,6 +12,24 @@ function StudentList() {
   
   const navigate = useNavigate();
 
+  // --- FIXED: Wrapped in useCallback to prevent infinite loops and clear the ESLint warning ---
+  const loadStudents = useCallback(() => {
+    const token = localStorage.getItem('jwtToken'); 
+    
+    axios.get('http://localhost:8080/api/students', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(response => setStudents(response.data.data)) 
+      .catch(error => {
+        console.error(error);
+        if (error.response && error.response.status === 403) {
+          alert("Session expired. Please login again.");
+          localStorage.clear();
+          navigate('/');
+        }
+      });
+  }, [navigate]); // Added navigate as a dependency
+
   useEffect(() => {
     const token = localStorage.getItem('jwtToken');
     const role = localStorage.getItem('userRole');
@@ -22,25 +40,7 @@ function StudentList() {
     }
     
     loadStudents();
-  }, [navigate]);
-
-  const loadStudents = () => {
-    const token = localStorage.getItem('jwtToken'); 
-    
-    axios.get('http://localhost:8080/api/students', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      // --- PHASE 1 FIX: Adding .data to read the new ApiResponse wrapper ---
-      .then(response => setStudents(response.data.data)) 
-      .catch(error => {
-        console.error(error);
-        if (error.response && error.response.status === 403) {
-          alert("Session expired. Please login again.");
-          localStorage.clear();
-          navigate('/');
-        }
-      });
-  };
+  }, [navigate, loadStudents]); // FIXED: Added loadStudents to the dependency array!
 
   const deleteStudent = (id) => {
     const token = localStorage.getItem('jwtToken'); 
