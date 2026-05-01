@@ -5,6 +5,7 @@ import com.example.sms.dto.ChangePasswordRequest;
 import com.example.sms.security.JwtUtil;
 import com.example.sms.entity.User;
 import com.example.sms.repository.UserRepository;
+import com.example.sms.service.EmailService; // <-- NEW: Imported EmailService
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,7 +33,11 @@ public class AuthController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    // 1. REGISTER ENDPOINT (Updated to Enterprise ApiResponse format)
+    // --- NEW: Bring in the EmailService ---
+    @Autowired
+    private EmailService emailService;
+
+    // 1. REGISTER ENDPOINT
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<String>> register(@RequestBody User user) {
         // Encrypt the password before saving!
@@ -42,7 +47,7 @@ public class AuthController {
                 HttpStatus.CREATED);
     }
 
-    // 2. LOGIN ENDPOINT (Updated to Enterprise ApiResponse format)
+    // 2. LOGIN ENDPOINT
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Map<String, String>>> login(@RequestBody Map<String, String> loginData) {
         String username = loginData.get("username");
@@ -69,7 +74,7 @@ public class AuthController {
                 HttpStatus.OK);
     }
 
-    // --- NEW: Change Password Endpoint (For logged-in users) ---
+    // --- Change Password Endpoint (For logged-in users) ---
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<String>> changePassword(@RequestBody ChangePasswordRequest request,
             Principal principal) {
@@ -93,7 +98,7 @@ public class AuthController {
                 HttpStatus.OK);
     }
 
-    // --- NEW: Step 1 of Forgot Password (Generate Token & "Send Email") ---
+    // --- Step 1 of Forgot Password (Generate Token & Send REAL Email) ---
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody Map<String, String> request) {
         String username = request.get("username");
@@ -102,28 +107,40 @@ public class AuthController {
         if (user == null) {
             // Security Best Practice: Don't reveal if a username exists or not
             return new ResponseEntity<>(new ApiResponse<>(HttpStatus.OK.value(),
-                    "If that account exists, a reset link has been generated."), HttpStatus.OK);
+                    "If that account exists, a reset link has been sent to the associated email address."),
+                    HttpStatus.OK);
         }
 
-        // Generate a random, secure token
+        // 1. Generate a random, secure token
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
         userRepository.save(user);
 
-        // Simulate sending an email by printing to the server console
-        System.out.println("\n=======================================================");
-        System.out.println("EMAIL SIMULATION - TO: " + username);
-        System.out.println("We heard you forgot your password. Click the link below to reset it:");
-        System.out.println("http://localhost:3000/reset-password/" + token);
-        System.out.println("=======================================================\n");
+        // 2. Generate the exact link the user needs to click
+        String resetLink = "http://localhost:3000/reset-password/" + token;
 
-        return new ResponseEntity<>(
-                new ApiResponse<>(HttpStatus.OK.value(),
-                        "If that account exists, a reset link has been generated. (Check Spring Boot Console!)"),
-                HttpStatus.OK);
+        // 3. Determine the user's email address (Assuming username is the email)
+        String userEmail = username;
+
+        try {
+            // 4. Send the actual email using Google's SMTP!
+            emailService.sendPasswordResetEmail(userEmail, resetLink);
+
+            return new ResponseEntity<>(
+                    new ApiResponse<>(HttpStatus.OK.value(),
+                            "Password reset link successfully sent to your email!"),
+                    HttpStatus.OK);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return new ResponseEntity<>(
+                    new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                            "Error sending email. Please check backend console or SMTP configuration."),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
-    // --- NEW: Step 2 of Forgot Password (Verify Token & Save New Password) ---
+    // --- Step 2 of Forgot Password (Verify Token & Save New Password) ---
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody Map<String, String> request) {
         String token = request.get("token");

@@ -1,4 +1,6 @@
+/* ========================================================= */
 /* --- iOS SYSTEM DESIGN SYSTEM (SF Pro Feel) --- */
+/* ========================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -15,7 +17,7 @@ body {
   margin: 0;
   /* iOS System Font Stack */
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "Helvetica Neue", sans-serif;
-  color: #000;
+  color: #1d1d1f;
   min-height: 100vh;
   overflow-x: hidden;
 
@@ -33,6 +35,7 @@ body {
 
   /* Smooth, slow color shift animation */
   animation: themeShift 15s ease-in-out infinite alternate;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @keyframes themeShift {
@@ -66,7 +69,10 @@ body {
   }
 }
 
-/* --- iOS BLURRED NAVIGATION BAR --- */
+/* ========================================================= */
+/* --- GLOBAL COMPONENT CLASSES (CLEAN & MODULAR) --- */
+/* ========================================================= */
+
 .navbar {
   display: flex;
   justify-content: space-between;
@@ -82,14 +88,56 @@ body {
   position: sticky;
   top: 20px;
   z-index: 1000;
+  transition: all 0.3s ease;
 }
 
-.navbar h1 {
-  margin: 0;
-  font-size: 20px;
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  padding: 35px;
+  border-radius: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.3s ease;
+}
+
+.inner-card {
+  background: rgba(0, 0, 0, 0.02);
+  padding: 30px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: #475569;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+  color: var(--system-blue);
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  border-radius: 14px;
+  border: none;
   font-weight: 700;
-  letter-spacing: -0.5px;
-  color: #1d1d1f;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.05);
+  color: #475569;
+  transition: all 0.2s;
+  text-transform: capitalize;
+}
+
+.tab-btn.active {
+  background: var(--system-blue) !important;
+  color: white !important;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
 }
 
 /* --- iOS "SQUISHY" BUTTONS --- */
@@ -97,7 +145,6 @@ body {
   border: none;
   padding: 10px 20px;
   border-radius: 18px;
-  /* High roundness */
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -109,7 +156,6 @@ body {
 
 .btn:active {
   transform: scale(0.93);
-  /* The Apple "Press" feel */
   filter: brightness(0.9);
 }
 
@@ -128,6 +174,18 @@ body {
   color: var(--system-red);
 }
 
+.btn-secondary {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: bold;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
 /* --- iOS INPUTS --- */
 .custom-input,
 .custom-select {
@@ -135,45 +193,47 @@ body {
   border-radius: 12px;
   border: none;
   background: rgba(0, 0, 0, 0.04);
-  /* Light translucent gray */
   font-family: inherit;
   font-weight: 500;
-  font-size: 16px;
-  /* Native iOS size */
-  transition: background 0.2s ease;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  color: inherit;
 }
 
-.custom-input:focus {
+.custom-input:focus,
+.custom-select:focus {
   background: rgba(0, 0, 0, 0.06);
   outline: 2px solid var(--system-blue);
+  outline-offset: -2px;
 }
 
-/* --- iOS LIST / TABLE (Stacking Cards Style) --- */
+/* --- iOS LIST / TABLE --- */
 .custom-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: var(--ios-glass);
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(25px) saturate(180%);
-  border-radius: 24px;
+  border-radius: 16px;
   border: 1px solid var(--ios-border);
   overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
 }
 
 .custom-table th {
-  padding: 18px 20px;
+  padding: 14px 20px;
   color: var(--system-gray);
   font-size: 13px;
-  text-transform: none;
-  /* iOS uses Sentence case */
   font-weight: 600;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  text-align: left;
 }
 
 .custom-table td {
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  font-size: 14px;
 }
 
 .custom-table tbody tr:last-child td {
@@ -185,7 +245,7 @@ body {
 }
 
 .custom-table tbody tr:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 /* --- iOS PILL BADGES --- */
@@ -212,16 +272,15 @@ body {
   color: #5856d6;
 }
 
-/* --- PERFORMANCE: YEAR GRID --- */
+/* --- GRID & ANIMATIONS --- */
 .year-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
 
-/* --- ANIMATION: iOS SLIDE --- */
 tbody tr {
-  animation: iosSlideIn 0.4s ease-out backwards;
+  animation: iosSlideIn 0.3s ease-out backwards;
 }
 
 @keyframes iosSlideIn {
@@ -234,4 +293,93 @@ tbody tr {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ========================================================= */
+/* --- DARK MODE SYSTEM OVERRIDES --- */
+/* ========================================================= */
+
+body.dark-mode {
+  background-color: #121212;
+  background-image:
+    radial-gradient(circle at center, #333 1.5px, transparent 1.5px),
+    radial-gradient(at 0% 0%, rgba(10, 132, 255, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(94, 92, 230, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(255, 45, 85, 0.1) 0px, transparent 50%);
+  color: #f5f5f7;
+}
+
+body.dark-mode .dashboard-container,
+body.dark-mode .navbar h1 {
+  color: #f5f5f7;
+}
+
+/* Dark Navbar & Glass Panels */
+body.dark-mode .navbar,
+body.dark-mode .glass-panel {
+  background: rgba(30, 30, 30, 0.65) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+body.dark-mode .inner-card {
+  background: rgba(0, 0, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Dark Tables & Inputs */
+body.dark-mode .custom-table,
+body.dark-mode input,
+body.dark-mode select {
+  background: rgba(40, 40, 40, 0.6) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f5f5f7 !important;
+}
+
+body.dark-mode .custom-table th,
+body.dark-mode .custom-table td {
+  border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+body.dark-mode .custom-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Buttons & Links in Dark Mode */
+body.dark-mode .nav-link {
+  color: #e2e8f0;
+}
+
+body.dark-mode .nav-link:hover {
+  color: #60a5fa;
+}
+
+body.dark-mode .tab-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+}
+
+body.dark-mode .tab-btn.active {
+  background: var(--system-blue) !important;
+  color: white !important;
+}
+
+body.dark-mode .btn-secondary {
+  background: #333 !important;
+  color: #fff !important;
+  border-color: #555 !important;
+}
+
+/* Text overrides */
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode td strong,
+body.dark-mode span {
+  color: #f5f5f7;
+}
+
+body.dark-mode p,
+body.dark-mode th {
+  color: #98989d;
 }
