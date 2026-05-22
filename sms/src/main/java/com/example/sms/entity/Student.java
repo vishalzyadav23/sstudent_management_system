@@ -16,6 +16,10 @@ public class Student {
     private String academicYear;
     private String address;
 
+    // --- NEW: Added field to store the profile picture ---
+    @Column(columnDefinition = "TEXT")
+    private String profileImageUrl;
+
     public Student() {
     }
 
@@ -82,5 +86,14 @@ public class Student {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    // --- NEW: Getter and Setter for the profile picture ---
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
     }
 }

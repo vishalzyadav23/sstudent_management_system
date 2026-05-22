@@ -19,6 +19,15 @@ public class Course {
     private int credits;
     private int semester; // e.g., Semester 1, 2, 3...
 
+    // --- NEW FIELD: Class Date & Time ---
+    private String classTiming; // e.g., "Mon & Wed 10:00 AM"
+
+    @Column(columnDefinition = "TEXT")
+    private String content; // Syllabus/Notes
+
+    @Column(columnDefinition = "TEXT")
+    private String videoUrl; // YouTube link
+
     // --- GETTERS AND SETTERS ---
 
     public Long getId() {
@@ -59,5 +68,30 @@ public class Course {
 
     public void setSemester(int semester) {
         this.semester = semester;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String getVideoUrl() {
+        return videoUrl;
+    }
+
+    public void setVideoUrl(String videoUrl) {
+        this.videoUrl = videoUrl;
+    }
+
+    // --- NEW GETTER/SETTER FOR SCHEDULE TIMING ---
+    public String getClassTiming() {
+        return classTiming;
+    }
+
+    public void setClassTiming(String classTiming) {
+        this.classTiming = classTiming;
     }
 }

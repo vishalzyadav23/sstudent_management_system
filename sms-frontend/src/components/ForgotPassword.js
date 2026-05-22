@@ -3,22 +3,38 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 
 function ForgotPassword() {
-  const [username, setUsername] = useState('');
+  // Changed from username to email
+  const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [isError, setIsError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Added loading state
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setMessage('');
+    
+    if (!email) {
+      setMessage('Please enter a valid email address.');
+      setIsError(true);
+      return;
+    }
 
-    axios.post('http://localhost:8080/api/auth/forgot-password', { username })
+    setMessage('');
+    setIsLoading(true); // Start loading animation
+
+    // Send the email to your Spring Boot backend
+    axios.post('http://localhost:8080/api/auth/forgot-password', { email: email })
       .then(response => {
         setIsError(false);
-        setMessage(response.data.message);
+        // Show the green success message from your design
+        setMessage("If that account exists, a reset link has been sent to the associated email address.");
+        setEmail(''); // Clear the input box
       })
       .catch(error => {
         setIsError(true);
-        setMessage(error.response?.data?.message || "An error occurred.");
+        setMessage(error.response?.data?.message || "Failed to send email. Please check backend SMTP config.");
+      })
+      .finally(() => {
+        setIsLoading(false); // Stop loading animation
       });
   };
 
@@ -37,7 +53,7 @@ function ForgotPassword() {
           Forgot Password
         </h2>
         <p style={{ textAlign: 'center', color: '#8e8e93', fontSize: '14px', marginBottom: '25px', fontWeight: '500' }}>
-          Enter your username and we will generate a reset link.
+          Enter your email address and we will generate a reset link.
         </p>
 
         {message && (
@@ -57,10 +73,10 @@ function ForgotPassword() {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           <input 
-            type="text" 
-            placeholder="Username" 
-            value={username} 
-            onChange={(e) => setUsername(e.target.value)} 
+            type="email" 
+            placeholder="vishuyadav636064@gmail.com" 
+            value={email} 
+            onChange={(e) => setEmail(e.target.value)} 
             className="custom-input"
             style={{ 
               width: '100%', 
@@ -69,12 +85,28 @@ function ForgotPassword() {
               fontSize: '15px',
               backgroundColor: 'rgba(0,0,0,0.03)',
               border: 'none',
-              borderRadius: '12px'
+              borderRadius: '12px',
+              outline: 'none'
             }}
             required 
           />
-          <button type="submit" className="btn btn-add" style={{ width: '100%', padding: '14px', marginTop: '10px', fontSize: '16px', borderRadius: '14px' }}>
-            Send Reset Link
+          <button 
+            type="submit" 
+            className="btn btn-add" 
+            disabled={isLoading}
+            style={{ 
+              width: '100%', 
+              padding: '14px', 
+              marginTop: '10px', 
+              fontSize: '16px', 
+              borderRadius: '14px',
+              backgroundColor: isLoading ? '#a1a1aa' : '#007aff',
+              color: 'white',
+              border: 'none',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold'
+            }}>
+            {isLoading ? 'Sending...' : 'Send Reset Link'}
           </button>
         </form>
 

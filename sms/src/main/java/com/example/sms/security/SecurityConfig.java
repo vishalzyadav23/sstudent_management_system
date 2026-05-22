@@ -31,7 +31,8 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll() // Leave the login/register doors unlocked!
+                        // 👇 NEW: We added "/api/health/**" here so the ESP8266 can send data!
+                        .requestMatchers("/api/auth/**", "/api/health/**").permitAll()
                         .anyRequest().authenticated() // Lock EVERYTHING else down!
                 )
                 .sessionManagement(sess -> sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

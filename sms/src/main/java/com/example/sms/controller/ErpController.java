@@ -31,8 +31,6 @@ public class ErpController {
     @Autowired
     private MarksService marksService;
 
-    // (Removed unused attendanceService to clear the yellow warning)
-
     // --- REPOSITORIES ADDED FOR QUICK DATA ENTRY ---
     @Autowired
     private StudentRepository studentRepo;
@@ -59,6 +57,30 @@ public class ErpController {
     public ResponseEntity<?> deleteCourse(@PathVariable Long id) {
         courseService.deleteCourse(id);
         return ResponseEntity.ok().body("{\"message\": \"Subject deleted successfully\"}");
+    }
+
+    // --- FIXED: UPDATE COURSE MATERIAL (CONTENT & VIDEO) ---
+    @PutMapping("/courses/{id}/material")
+    public ResponseEntity<?> updateCourseMaterial(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        try {
+            Course course = courseRepo.findById(id).orElseThrow(() -> new RuntimeException("Course not found"));
+
+            // Safely extract and save content
+            if (payload.containsKey("content") && payload.get("content") != null) {
+                course.setContent(String.valueOf(payload.get("content")));
+            }
+
+            // Safely extract and save video URL
+            if (payload.containsKey("videoUrl") && payload.get("videoUrl") != null) {
+                course.setVideoUrl(String.valueOf(payload.get("videoUrl")));
+            }
+
+            courseRepo.save(course);
+            return ResponseEntity.ok().body("{\"message\": \"Course material updated successfully!\"}");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("{\"error\": \"Failed to update course material.\"}");
+        }
     }
 
     // --- FACULTY APIs ---
@@ -106,7 +128,6 @@ public class ErpController {
         return ResponseEntity.ok(marksService.getStudentReportCard(studentId));
     }
 
-    // --- NEW: FETCH STUDENT ATTENDANCE ---
     @GetMapping("/student/{studentId}/attendance")
     public ResponseEntity<?> getStudentAttendance(@PathVariable Long studentId) {
         return ResponseEntity.ok(attendanceRepo.findByStudentId(studentId));
@@ -116,18 +137,15 @@ public class ErpController {
     // --- ACADEMIC RECORD UPDATES (Admin/Faculty) ---
     // ==========================================
 
-    // --- NEW: PUBLISH GRADES ---
     @PostMapping("/marks/publish")
     public ResponseEntity<?> publishMarks(@RequestBody Map<String, Object> payload) {
         try {
             Long studentId = ((Number) payload.get("studentId")).longValue();
             Long courseId = ((Number) payload.get("courseId")).longValue();
 
-            // FIXED: Changed from .intValue() to .doubleValue() to match your Marks entity
             Double internal = ((Number) payload.get("internalMarks")).doubleValue();
             Double semester = ((Number) payload.get("semesterMarks")).doubleValue();
 
-            // Auto-calculate total and grade using Double
             Double total = internal + semester;
             String grade = total >= 90 ? "A+"
                     : total >= 80 ? "A" : total >= 70 ? "B" : total >= 60 ? "C" : total >= 50 ? "D" : "F";
@@ -136,7 +154,6 @@ public class ErpController {
             marks.setStudent(studentRepo.findById(studentId).get());
             marks.setCourse(courseRepo.findById(courseId).get());
 
-            // FIXED: These now pass Double values correctly
             marks.setInternalMarks(internal);
             marks.setSemesterMarks(semester);
             marks.setTotalMarks(total);
@@ -149,7 +166,6 @@ public class ErpController {
         }
     }
 
-    // --- NEW: LOG DAILY ATTENDANCE ---
     @PostMapping("/attendance/log")
     public ResponseEntity<?> logAttendance(@RequestBody Map<String, Object> payload) {
         try {
@@ -172,16 +188,14 @@ public class ErpController {
     }
 
     // ==========================================
-    // --- NEW: ADMIN QUICK VIEW APIs ---
+    // --- ADMIN QUICK VIEW APIs ---
     // ==========================================
 
-    // --- NEW: Fetch specific student Marks for the Admin Dashboard ---
     @GetMapping("/marks/student/{id}")
     public ResponseEntity<?> getMarksForStudent(@PathVariable Long id) {
         return ResponseEntity.ok(marksRepo.findByStudentId(id));
     }
 
-    // --- NEW: Fetch specific student Attendance for the Admin Dashboard ---
     @GetMapping("/attendance/student/{id}")
     public ResponseEntity<?> getAttendanceForStudent(@PathVariable Long id) {
         return ResponseEntity.ok(attendanceRepo.findByStudentId(id));

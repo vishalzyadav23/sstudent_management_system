@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api'; // <-- Changed from axios to your secure api interceptor
 
 function FacultyDashboard() {
   const [activeTab, setActiveTab] = useState('classes');
@@ -13,13 +13,13 @@ function FacultyDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch all courses we created in the database
-        const coursesRes = await axios.get('http://localhost:8080/api/erp/courses');
-        setCourses(coursesRes.data);
+        // Fetch all courses we created in the database using the interceptor
+        const coursesRes = await api.get('/erp/courses');
+        setCourses(coursesRes.data.data || coursesRes.data || []);
 
         // Fetch all students to build our attendance roster
-        const studentsRes = await axios.get('http://localhost:8080/api/students');
-        setStudents(studentsRes.data);
+        const studentsRes = await api.get('/students');
+        setStudents(studentsRes.data.data || studentsRes.data || []);
         
         setLoading(false);
       } catch (error) {

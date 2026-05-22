@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map; // Imported to handle the JSON request body
 
 @RestController
 @RequestMapping("/api/students")
@@ -87,6 +88,23 @@ public class StudentController {
         return new ResponseEntity<>(
                 new ApiResponse<>(HttpStatus.OK.value(), "Your profile has been updated successfully!", updatedStudent),
                 HttpStatus.OK);
+    }
+
+    // --- NEW: Save Profile Picture Endpoint ---
+    @PutMapping("/{id}/photo")
+    public ResponseEntity<?> updateProfilePhoto(@PathVariable Long id, @RequestBody Map<String, String> request) {
+
+        // 1. Find the student in the database
+        Student student = studentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
+
+        // 2. Grab the Base64 image string sent from React and set it
+        student.setProfileImageUrl(request.get("profileImageUrl"));
+
+        // 3. Save the student back to the database permanently
+        studentRepository.save(student);
+
+        return ResponseEntity.ok(Map.of("message", "Profile photo saved successfully!"));
     }
 
     // --- ADMIN ONLY: Deleting a student ---

@@ -5,7 +5,7 @@ import com.example.sms.dto.ChangePasswordRequest;
 import com.example.sms.security.JwtUtil;
 import com.example.sms.entity.User;
 import com.example.sms.repository.UserRepository;
-import com.example.sms.service.EmailService; // <-- NEW: Imported EmailService
+import com.example.sms.service.EmailService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,15 +32,12 @@ public class AuthController {
     private UserRepository userRepository;
     @Autowired
     private PasswordEncoder passwordEncoder;
-
-    // --- NEW: Bring in the EmailService ---
     @Autowired
     private EmailService emailService;
 
     // 1. REGISTER ENDPOINT
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<String>> register(@RequestBody User user) {
-        // Encrypt the password before saving!
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         userRepository.save(user);
         return new ResponseEntity<>(new ApiResponse<>(HttpStatus.CREATED.value(), "User created successfully!"),
@@ -53,19 +50,15 @@ public class AuthController {
         String username = loginData.get("username");
         String password = loginData.get("password");
 
-        // The Bouncer checks the credentials here.
         authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
 
-        // If correct, find the user and print the wristband!
         User user = userRepository.findByUsername(username).orElseThrow();
         String token = jwtUtil.generateToken(username, user.getRole().name());
 
-        // Send the token and role back to React/Postman
         Map<String, String> responseData = new HashMap<>();
         responseData.put("token", token);
         responseData.put("role", user.getRole().name());
 
-        // Send the Student ID if they are a student
         if (user.getStudent() != null) {
             responseData.put("studentId", String.valueOf(user.getStudent().getId()));
         }
@@ -74,7 +67,7 @@ public class AuthController {
                 HttpStatus.OK);
     }
 
-    // --- Change Password Endpoint (For logged-in users) ---
+    // --- Change Password Endpoint ---
     @PostMapping("/change-password")
     public ResponseEntity<ApiResponse<String>> changePassword(@RequestBody ChangePasswordRequest request,
             Principal principal) {
@@ -98,40 +91,45 @@ public class AuthController {
                 HttpStatus.OK);
     }
 
-    // --- Step 1 of Forgot Password (Generate Token & Send REAL Email) ---
+    // --- Step 1 of Forgot Password (PRODUCTION READY) ---
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody Map<String, String> request) {
-        String username = request.get("username");
-        User user = userRepository.findByUsername(username).orElse(null);
+        String email = request.get("email");
 
+        if (email == null || email.isEmpty()) {
+            return new ResponseEntity<>(new ApiResponse<>(HttpStatus.BAD_REQUEST.value(), "Email is required!"),
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userRepository.findByUsername(email).orElse(null);
+
+        // Security Check: If user doesn't exist, stop here but don't tell the hacker!
         if (user == null) {
-            // Security Best Practice: Don't reveal if a username exists or not
-            return new ResponseEntity<>(new ApiResponse<>(HttpStatus.OK.value(),
-                    "If that account exists, a reset link has been sent to the associated email address."),
+            return new ResponseEntity<>(
+                    new ApiResponse<>(HttpStatus.OK.value(),
+                            "If that account exists, a reset link has been sent to the associated email address."),
                     HttpStatus.OK);
         }
 
-        // 1. Generate a random, secure token
+        // 1. Generate token and SAVE it to the existing user in the database
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
         userRepository.save(user);
 
-        // 2. Generate the exact link the user needs to click
+        // 2. Generate link
         String resetLink = "http://localhost:3000/reset-password/" + token;
 
-        // 3. Determine the user's email address (Assuming username is the email)
-        String userEmail = username;
-
         try {
-            // 4. Send the actual email using Google's SMTP!
-            emailService.sendPasswordResetEmail(userEmail, resetLink);
+            // 3. Send Email
+            emailService.sendPasswordResetEmail(email, resetLink);
 
             return new ResponseEntity<>(
                     new ApiResponse<>(HttpStatus.OK.value(),
-                            "Password reset link successfully sent to your email!"),
+                            "If that account exists, a reset link has been sent to the associated email address."),
                     HttpStatus.OK);
 
         } catch (Exception e) {
+            System.out.println("❌ SMTP ERROR: " + e.getMessage());
             e.printStackTrace();
             return new ResponseEntity<>(
                     new ApiResponse<>(HttpStatus.INTERNAL_SERVER_ERROR.value(),
@@ -140,7 +138,7 @@ public class AuthController {
         }
     }
 
-    // --- Step 2 of Forgot Password (Verify Token & Save New Password) ---
+    // --- Step 2 of Forgot Password ---
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<String>> resetPassword(@RequestBody Map<String, String> request) {
         String token = request.get("token");
@@ -154,7 +152,7 @@ public class AuthController {
                     HttpStatus.BAD_REQUEST);
         }
 
-        // Encrypt the new password and clear the token so it can't be used twice!
+        // Encrypt new password, clear the token, and save
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setResetToken(null);
         userRepository.save(user);

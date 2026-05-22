@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api'; 
 import { useNavigate } from 'react-router-dom';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 function StudentProfile() {
   // --- UI STATES ---
@@ -11,7 +12,8 @@ function StudentProfile() {
   const [student, setStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [marks, setMarks] = useState([]);
-  const [attendance, setAttendance] = useState([]); // State for Attendance Data
+  const [attendance, setAttendance] = useState([]); 
+  const [healthData, setHealthData] = useState([]); 
   
   // --- EDIT PROFILE STATES ---
   const [isEditing, setIsEditing] = useState(false);
@@ -25,14 +27,16 @@ function StudentProfile() {
   const [pwdMessage, setPwdMessage] = useState('');
   const [isPwdError, setIsPwdError] = useState(false);
 
-  // --- PROFILE PICTURE STATES (Saves to memory) ---
-  const [profilePic, setProfilePic] = useState(localStorage.getItem('savedProfilePic') || null);
+  // --- PROFILE PICTURE STATE ---
+  const [profilePic, setProfilePic] = useState(null);
+
+  // --- NEW: LEARNING PORTAL STATE ---
+  const [selectedClass, setSelectedClass] = useState(null);
 
   const navigate = useNavigate();
   const studentId = localStorage.getItem('studentId');
-  // NOTE: 'username' variable was removed here to clear the React warning!
 
-  // Fetch all student data (Profile, Classes, Grades, Attendance)
+  // Fetch standard data on load
   useEffect(() => {
     if (!studentId) {
       navigate('/');
@@ -41,22 +45,20 @@ function StudentProfile() {
 
     const fetchAllData = async () => {
       try {
-        // 1. Fetch Basic Profile
-        const profileRes = await axios.get(`http://localhost:8080/api/students/${studentId}`);
+        const profileRes = await api.get(`/students/${studentId}`);
         const studentData = profileRes.data.data || profileRes.data; 
         setStudent(studentData);
         setFormData({ email: studentData.email || '', address: studentData.address || '' });
+        
+        setProfilePic(studentData.profileImageUrl || null);
 
-        // 2. Fetch Enrolled Classes (Bulletproofed wrapper check)
-        const classesRes = await axios.get(`http://localhost:8080/api/erp/student/${studentId}/classes`);
+        const classesRes = await api.get(`/erp/student/${studentId}/classes`);
         setClasses(classesRes.data.data || classesRes.data || []);
 
-        // 3. Fetch Grades (Bulletproofed wrapper check)
-        const marksRes = await axios.get(`http://localhost:8080/api/erp/student/${studentId}/marks`);
+        const marksRes = await api.get(`/erp/student/${studentId}/marks`);
         setMarks(marksRes.data.data || marksRes.data || []);
 
-        // 4. Fetch Attendance
-        const attRes = await axios.get(`http://localhost:8080/api/erp/student/${studentId}/attendance`);
+        const attRes = await api.get(`/erp/student/${studentId}/attendance`);
         setAttendance(attRes.data.data || attRes.data || []);
 
         setLoading(false);
@@ -69,10 +71,38 @@ function StudentProfile() {
     fetchAllData();
   }, [navigate, studentId]);
 
+  // --- LIVE IOT HEALTH DATA POLLING ---
+  useEffect(() => {
+    if (activeTab !== "health") return; 
+
+    const fetchHealthData = async () => {
+      try {
+        const res = await api.get(`/health/student/${studentId}`);
+        let data = res.data.data || res.data || [];
+        
+        data = data.slice(0, 20).reverse(); 
+        
+        const formattedData = data.map(record => ({
+          ...record,
+          timeLabel: new Date(record.recordedAt).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second:'2-digit' })
+        }));
+
+        setHealthData(formattedData);
+      } catch (err) {
+        console.error("Error fetching health data", err);
+      }
+    };
+
+    fetchHealthData(); 
+    const interval = setInterval(fetchHealthData, 2000);
+
+    return () => clearInterval(interval); 
+  }, [activeTab, studentId]);
+
   // --- Logic: Update Profile (Email/Address) ---
   const handleProfileUpdate = (e) => {
     e.preventDefault();
-    axios.put(`http://localhost:8080/api/students/my-profile/${studentId}`, formData)
+    api.put(`/students/my-profile/${studentId}`, formData)
     .then(res => {
       setStudent(res.data.data || res.data);
       setIsEditing(false);
@@ -91,7 +121,7 @@ function StudentProfile() {
       return;
     }
 
-    axios.post('http://localhost:8080/api/auth/change-password', { oldPassword, newPassword })
+    api.post('/auth/change-password', { oldPassword, newPassword })
     .then(res => {
       setIsPwdError(false);
       setPwdMessage("Security updated successfully!");
@@ -109,15 +139,27 @@ function StudentProfile() {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader(); 
-      
-      reader.onloadend = () => {
+      reader.onloadend = async () => {
         const base64String = reader.result; 
         setProfilePic(base64String); 
-        localStorage.setItem('savedProfilePic', base64String); 
+        
+        try {
+          await api.put(`/students/${studentId}/photo`, { profileImageUrl: base64String });
+        } catch (error) {
+          console.error("Failed to save photo to DB:", error);
+          alert("Failed to permanently save the profile picture to the server.");
+        }
       };
-      
       reader.readAsDataURL(file); 
     }
+  };
+
+  // --- Helper: Convert Standard YouTube Links to Embed Links ---
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    if (url.includes("watch?v=")) return url.replace("watch?v=", "embed/");
+    if (url.includes("youtu.be/")) return url.replace("youtu.be/", "www.youtube.com/embed/");
+    return url;
   };
 
   if (loading) return <div style={{ textAlign: 'center', marginTop: '100px', fontWeight: '600', color: '#8e8e93' }}>Loading Student Portal...</div>;
@@ -133,24 +175,23 @@ function StudentProfile() {
         </h2>
         <p style={{ margin: 0, color: '#8e8e93', fontWeight: '500', fontSize: '16px' }}>Student ID: #{student.rollNumber || studentId} | Manage your academics and identity.</p>
         
-        {/* Tab Navigation - INCLUDES ATTENDANCE */}
         <div style={{ display: 'flex', gap: '12px', marginTop: '30px', flexWrap: 'wrap' }}>
-          {['personal', 'classes', 'grades', 'attendance'].map(tab => (
+          {['personal', 'classes', 'grades', 'attendance', 'health'].map(tab => (
             <button 
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); setSelectedClass(null); }} // Reset selected class on tab change
               style={{ 
                 padding: '12px 24px', 
                 borderRadius: '14px', 
                 border: 'none', 
                 fontWeight: '700', 
                 cursor: 'pointer', 
-                background: activeTab === tab ? '#007aff' : 'rgba(0,0,0,0.05)', 
+                background: activeTab === tab ? (tab === 'health' ? '#ff2d55' : '#007aff') : 'rgba(0,0,0,0.05)', 
                 color: activeTab === tab ? 'white' : '#475569', 
                 transition: 'all 0.2s',
               }}
             >
-              {tab === 'personal' ? '👤 Personal Info' : tab === 'classes' ? '📚 My Schedule' : tab === 'grades' ? '🎓 Report Card' : '📅 Attendance'}
+              {tab === 'personal' ? '👤 Personal Info' : tab === 'classes' ? '📚 My Schedule' : tab === 'grades' ? '🎓 Report Card' : tab === 'attendance' ? '📅 Attendance' : '🩺 Live Vitals'}
             </button>
           ))}
         </div>
@@ -159,17 +200,79 @@ function StudentProfile() {
       {/* --- MAIN CONTENT AREA --- */}
       <div style={{ minHeight: '40vh' }}>
         
-        {/* =========================================
-            TAB 1: PERSONAL INFO & SECURITY 
-            ========================================= */}
+        {/* TAB: LIVE HEALTH & VITALS */}
+        {activeTab === 'health' && (
+          <div style={{ animation: "appLaunch 0.4s ease-out" }}>
+            <div style={{ display: "flex", gap: "15px", marginBottom: "20px", flexWrap: "wrap" }}>
+              
+              <div style={{ flex: 1, minWidth: "160px", background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(255,45,85,0.1)", borderLeft: "5px solid #ff2d55" }}>
+                <h4 style={{ margin: 0, color: "#8e8e93", fontSize: "12px", textTransform: "uppercase" }}>Heart Rate</h4>
+                <div style={{ fontSize: "36px", fontWeight: "800", color: "#ff2d55", marginTop: "10px" }}>
+                  {healthData.length > 0 ? healthData[healthData.length - 1].bpm : "--"} <span style={{fontSize: "14px", color: "#8e8e93"}}>BPM</span>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, minWidth: "160px", background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(88,86,214,0.1)", borderLeft: "5px solid #5856d6" }}>
+                <h4 style={{ margin: 0, color: "#8e8e93", fontSize: "12px", textTransform: "uppercase" }}>Blood Oxygen</h4>
+                <div style={{ fontSize: "36px", fontWeight: "800", color: "#5856d6", marginTop: "10px" }}>
+                  {healthData.length > 0 ? healthData[healthData.length - 1].spo2 : "--"} <span style={{fontSize: "14px", color: "#8e8e93"}}>%</span>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, minWidth: "160px", background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(255,149,0,0.1)", borderLeft: "5px solid #ff9500" }}>
+                <h4 style={{ margin: 0, color: "#8e8e93", fontSize: "12px", textTransform: "uppercase" }}>Body Temp</h4>
+                <div style={{ fontSize: "36px", fontWeight: "800", color: "#ff9500", marginTop: "10px" }}>
+                  {healthData.length > 0 && healthData[healthData.length - 1].bodyTemp ? healthData[healthData.length - 1].bodyTemp.toFixed(1) : "--"} <span style={{fontSize: "14px", color: "#8e8e93"}}>°C</span>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, minWidth: "160px", background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(50,173,230,0.1)", borderLeft: "5px solid #32ade6" }}>
+                <h4 style={{ margin: 0, color: "#8e8e93", fontSize: "12px", textTransform: "uppercase" }}>Room Temp</h4>
+                <div style={{ fontSize: "36px", fontWeight: "800", color: "#32ade6", marginTop: "10px" }}>
+                  {healthData.length > 0 && healthData[healthData.length - 1].roomTemp ? healthData[healthData.length - 1].roomTemp.toFixed(1) : "--"} <span style={{fontSize: "14px", color: "#8e8e93"}}>°C</span>
+                </div>
+              </div>
+
+              <div style={{ flex: 1, minWidth: "160px", background: "white", padding: "20px", borderRadius: "20px", boxShadow: "0 10px 30px rgba(52,199,89,0.1)", borderLeft: "5px solid #34c759" }}>
+                <h4 style={{ margin: 0, color: "#8e8e93", fontSize: "12px", textTransform: "uppercase" }}>Room Humidity</h4>
+                <div style={{ fontSize: "36px", fontWeight: "800", color: "#34c759", marginTop: "10px" }}>
+                  {healthData.length > 0 && healthData[healthData.length - 1].roomHumidity ? healthData[healthData.length - 1].roomHumidity.toFixed(1) : "--"} <span style={{fontSize: "14px", color: "#8e8e93"}}>%</span>
+                </div>
+              </div>
+
+            </div>
+
+            <div style={{ background: "white", padding: "30px", borderRadius: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.05)" }}>
+              <h3 style={{ margin: "0 0 20px 0", color: "#1d1d1f" }}>Real-Time Physiological Telemetry</h3>
+              {healthData.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#8e8e93" }}>Waiting for Edge Device connection...</div>
+              ) : (
+                <div style={{ width: '100%', height: 350 }}>
+                  <ResponsiveContainer>
+                    <LineChart data={healthData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5ea" />
+                      <XAxis dataKey="timeLabel" stroke="#8e8e93" fontSize={12} tickMargin={10} />
+                      <YAxis yAxisId="left" domain={['dataMin - 5', 'dataMax + 5']} stroke="#ff2d55" fontSize={12} />
+                      <YAxis yAxisId="right" orientation="right" domain={[90, 100]} stroke="#5856d6" fontSize={12} />
+                      <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 30px rgba(0,0,0,0.1)" }} />
+                      <Legend wrapperStyle={{ paddingTop: "20px" }} />
+                      <Line yAxisId="left" type="monotone" dataKey="bpm" name="Heart Rate (BPM)" stroke="#ff2d55" strokeWidth={4} dot={{ r: 4, fill: "#ff2d55" }} activeDot={{ r: 8 }} isAnimationActive={false} />
+                      <Line yAxisId="right" type="monotone" dataKey="spo2" name="Blood Oxygen (%)" stroke="#5856d6" strokeWidth={4} dot={{ r: 4, fill: "#5856d6" }} activeDot={{ r: 8 }} isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 1: PERSONAL INFO */}
         {activeTab === 'personal' && (
           <div style={{ animation: 'appLaunch 0.4s ease-out', maxWidth: '700px', margin: '0 auto' }}>
             
-            {/* Identity Card with Interactive Avatar */}
             <div style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(30px)', padding: '30px', borderRadius: '28px', border: '1px solid var(--ios-border)', boxShadow: '0 10px 40px rgba(0,0,0,0.03)', marginBottom: '25px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
                 
-                {/* Clickable Image Upload Area */}
                 <label style={{ cursor: 'pointer', position: 'relative' }}>
                   <div style={{ 
                     width: '90px', height: '90px', 
@@ -202,7 +305,6 @@ function StudentProfile() {
               </div>
             </div>
 
-            {/* Editable Contact Info */}
             <div style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(30px)', padding: '30px', borderRadius: '28px', border: '1px solid var(--ios-border)', boxShadow: '0 10px 40px rgba(0,0,0,0.03)', marginBottom: '25px' }}>
               <h4 style={{ margin: '0 0 20px 0', fontSize: '17px', fontWeight: '700' }}>Contact Details</h4>
               {profileMessage && <div style={{ background: '#dcfce7', color: '#166534', padding: '10px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{profileMessage}</div>}
@@ -228,7 +330,6 @@ function StudentProfile() {
               </form>
             </div>
 
-            {/* Security */}
             <div style={{ background: 'rgba(255,255,255,0.9)', backdropFilter: 'blur(30px)', padding: '30px', borderRadius: '28px', border: '1px solid var(--ios-border)', boxShadow: '0 10px 40px rgba(0,0,0,0.03)' }}>
               <h4 style={{ margin: '0 0 20px 0', fontSize: '17px', fontWeight: '700' }}>Security</h4>
               {pwdMessage && <div style={{ background: isPwdError ? '#fee2e2' : '#dcfce7', color: isPwdError ? '#991b1b' : '#166534', padding: '10px', borderRadius: '12px', marginBottom: '15px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{pwdMessage}</div>}
@@ -245,33 +346,96 @@ function StudentProfile() {
           </div>
         )}
 
-        {/* =========================================
-            TAB 2: CLASSES (ERP)
-            ========================================= */}
+        {/* TAB 2: CLASSES (NOW WITH LEARNING PORTAL DRILL-DOWN) */}
         {activeTab === 'classes' && (
           <div style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(30px)', padding: '35px', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', animation: 'appLaunch 0.4s ease-out' }}>
-            <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f' }}>Current Semester Enrollments</h3>
             
-            {classes.length === 0 ? (
-              <p style={{ color: '#8e8e93', background: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>You are not currently enrolled in any classes.</p>
-            ) : (
-              <div className="year-grid">
-                {classes.map(enroll => (
-                  <div key={enroll.id} style={{ background: 'white', padding: '24px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: '#007aff', marginBottom: '8px' }}>{enroll.course?.courseCode || 'N/A'} • Sec {enroll.section}</div>
-                    <div style={{ fontSize: '20px', fontWeight: '700', color: '#1d1d1f', marginBottom: '10px' }}>{enroll.course?.courseName || 'Unknown Course'}</div>
-                    <div style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>👨‍🏫 Prof. {enroll.faculty?.name || 'TBA'}</div>
-                    <div style={{ fontSize: '13px', color: '#8e8e93', marginTop: '5px' }}>{enroll.academicSemester} • {enroll.course?.credits || 0} Credits</div>
+            {/* IF NO CLASS IS SELECTED -> SHOW GRID */}
+            {!selectedClass ? (
+              <>
+                <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f', marginBottom: '5px' }}>Current Semester Enrollments</h3>
+                <p style={{ color: '#8e8e93', marginBottom: '25px', fontSize: '15px' }}>Click on any class to view syllabus notes and video lectures.</p>
+                
+                {classes.length === 0 ? (
+                  <p style={{ color: '#8e8e93', background: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>You are not currently enrolled in any classes.</p>
+                ) : (
+                  <div className="year-grid">
+                    {classes.map(enroll => (
+                      <div key={enroll.id} 
+                           onClick={() => setSelectedClass(enroll)}
+                           style={{ background: 'white', padding: '24px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.03)', cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'scale(1.02)' } }}>
+                        <div style={{ fontSize: '13px', fontWeight: '800', color: '#007aff', marginBottom: '8px' }}>{enroll.course?.courseCode || 'N/A'} • Sec {enroll.section}</div>
+                        <div style={{ fontSize: '20px', fontWeight: '700', color: '#1d1d1f', marginBottom: '10px' }}>{enroll.course?.courseName || 'Unknown Course'}</div>
+                        <div style={{ fontSize: '14px', color: '#475569', fontWeight: '500' }}>👨‍🏫 Prof. {enroll.faculty?.name || 'TBA'}</div>
+                        <div style={{ fontSize: '13px', color: '#8e8e93', marginTop: '5px' }}>{enroll.academicSemester} • {enroll.course?.credits || 0} Credits</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+              </>
+            ) : (
+              /* IF CLASS IS SELECTED -> SHOW LEARNING PORTAL */
+              <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                
+                {/* Header & Back Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                  <button 
+                    onClick={() => setSelectedClass(null)} 
+                    style={{ padding: '8px 16px', borderRadius: '12px', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}>
+                    ⬅ Back to Schedule
+                  </button>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '24px', color: '#1d1d1f' }}>{selectedClass.course?.courseName}</h3>
+                    <p style={{ margin: 0, fontSize: '14px', color: '#8e8e93', fontWeight: '500' }}>{selectedClass.course?.courseCode} • Prof. {selectedClass.faculty?.name}</p>
+                  </div>
+                </div>
+
+                {/* Content Workspace */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
+                  
+                  {/* Syllabus / Notes Section */}
+                  <div style={{ flex: '1 1 300px', background: 'white', padding: '30px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                    <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', color: '#007aff', display: 'flex', alignItems: 'center', gap: '8px' }}><span>📄</span> Syllabus & Notes</h4>
+                    {selectedClass.course?.content ? (
+                      <div style={{ whiteSpace: 'pre-wrap', color: '#334155', fontSize: '15px', lineHeight: '1.6', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                        {selectedClass.course.content}
+                      </div>
+                    ) : (
+                      <p style={{ color: '#8e8e93', fontStyle: 'italic', background: '#f8fafc', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>No notes have been provided for this subject yet.</p>
+                    )}
+                  </div>
+
+                  {/* Video Lecture Section */}
+                  <div style={{ flex: '1 1 300px', background: 'white', padding: '30px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.02)' }}>
+                    <h4 style={{ margin: '0 0 15px 0', fontSize: '18px', color: '#ff2d55', display: 'flex', alignItems: 'center', gap: '8px' }}><span>🎥</span> Video Lecture</h4>
+                    {selectedClass.course?.videoUrl ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {/* Interactive embedded YouTube Player */}
+                        <div style={{ position: 'relative', paddingBottom: '56.25%', height: 0, overflow: 'hidden', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <iframe 
+                            src={getEmbedUrl(selectedClass.course.videoUrl)} 
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 0 }} 
+                            allowFullScreen 
+                            title="Course Video"
+                          ></iframe>
+                        </div>
+                        {/* Fallback external link button */}
+                        <a href={selectedClass.course.videoUrl} target="_blank" rel="noreferrer" style={{ display: 'block', textAlign: 'center', background: '#fff1f2', color: '#e11d48', padding: '12px', borderRadius: '10px', textDecoration: 'none', fontWeight: 'bold', border: '1px solid #fecdd3', transition: 'all 0.2s' }}>
+                          Watch externally on YouTube
+                        </a>
+                      </div>
+                    ) : (
+                      <p style={{ color: '#8e8e93', fontStyle: 'italic', background: '#f8fafc', padding: '20px', borderRadius: '12px', textAlign: 'center' }}>No video lecture linked for this subject.</p>
+                    )}
+                  </div>
+
+                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* =========================================
-            TAB 3: GRADES (ERP)
-            ========================================= */}
+        {/* TAB 3: GRADES */}
         {activeTab === 'grades' && (
           <div style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(30px)', padding: '35px', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', animation: 'appLaunch 0.4s ease-out' }}>
             <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f', marginBottom: '20px' }}>Official Report Card</h3>
@@ -309,9 +473,7 @@ function StudentProfile() {
           </div>
         )}
 
-        {/* =========================================
-            TAB 4: ATTENDANCE (ERP)
-            ========================================= */}
+        {/* TAB 4: ATTENDANCE */}
         {activeTab === 'attendance' && (
           <div style={{ background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(30px)', padding: '35px', borderRadius: '24px', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', animation: 'appLaunch 0.4s ease-out' }}>
             <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f', marginBottom: '20px' }}>Attendance History</h3>

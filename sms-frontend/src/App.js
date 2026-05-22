@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import axios from 'axios'; 
 import AdminDashboard from './components/AdminDashboard'; 
 import AddStudent from './components/AddStudent';
 import EditStudent from './components/EditStudent';
@@ -11,21 +10,6 @@ import ForgotPassword from './components/ForgotPassword';
 import ResetPassword from './components/ResetPassword';
 import FacultyDashboard from './components/FacultyDashboard'; 
 import './App.css';
-
-// --- GLOBAL AXIOS INTERCEPTOR ---
-// This automatically attaches your JWT token to every request sent to Spring Boot
-axios.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('jwtToken');
-    if (token) {
-      config.headers['Authorization'] = 'Bearer ' + token;
-    }
-    return config;
-  },
-  error => {
-    return Promise.reject(error);
-  }
-);
 
 function Navigation() {
   const navigate = useNavigate();
@@ -55,7 +39,7 @@ function Navigation() {
 
   return (
     <nav className="navbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: isDarkMode ? '#f5f5f7' : '#1d1d1f' }}>EduCore ERP</h1>
+      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: isDarkMode ? '#f5f5f7' : '#1d1d1f' }}>EduCore ERP & IoT Telemetry</h1>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
         

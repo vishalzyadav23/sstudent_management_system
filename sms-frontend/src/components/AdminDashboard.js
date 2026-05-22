@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import StudentList from './StudentList'; 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable'; 
 
 function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('courses');
@@ -15,7 +17,14 @@ function AdminDashboard() {
   const [courseName, setCourseName] = useState('');
   const [credits, setCredits] = useState('3'); 
   const [semester, setSemester] = useState('1'); 
+  const [classTiming, setClassTiming] = useState(''); // NEW: Schedule State
   const [courseMessage, setCourseMessage] = useState(''); 
+
+  // --- NEW: DRILL-DOWN SUBJECT FOLDER STATES ---
+  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [folderTab, setFolderTab] = useState('content'); // 'content' or 'videos'
+  const [tempContent, setTempContent] = useState('');
+  const [tempVideo, setTempVideo] = useState('');
 
   // --- STATES FOR NEW FACULTY FORM ---
   const [facName, setFacName] = useState('');
@@ -40,7 +49,7 @@ function AdminDashboard() {
   const [recordMessage, setRecordMessage] = useState('');
   const [bulkMarks, setBulkMarks] = useState({});
 
-  // --- NEW: STUDENT QUICK VIEW STATES (ALL DETAILS) ---
+  // --- STUDENT QUICK VIEW STATES (ALL DETAILS) ---
   const [viewStudentId, setViewStudentId] = useState('');
   const [showStudentInfo, setShowStudentInfo] = useState(false);
   const [showDirectory, setShowDirectory] = useState(true);
@@ -50,13 +59,13 @@ function AdminDashboard() {
   // --- STATE FOR INDIVIDUAL EXPORT ---
   const [exportStudentId, setExportStudentId] = useState('');
 
-  // Helper function to get the security token for backend requests
+  const navigate = () => window.location.href = '/'; // Fallback navigation
+
   const getAuthHeader = () => {
     const token = localStorage.getItem('jwtToken');
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
-  // Fetch initial data when dashboard loads
   useEffect(() => {
     fetchCourses();
     fetchFaculty();
@@ -74,7 +83,41 @@ function AdminDashboard() {
     })
     .catch(console.error);
 
-  // --- ADD METHODS ---
+  // --- DRILL DOWN FUNCTIONS ---
+  const openSubjectFolder = (subject) => {
+    setSelectedSubject(subject);
+    setFolderTab('content');
+    setTempContent(subject.content || '');
+    setTempVideo(subject.videoUrl || '');
+  };
+
+  // --- FIXED: PERMANENT DATABASE SAVE ---
+  const handleSaveMaterial = () => {
+    if (!selectedSubject) return;
+
+    axios.put(`http://localhost:8080/api/erp/courses/${selectedSubject.id}/material`, {
+      content: tempContent,
+      videoUrl: tempVideo
+    }, { headers: getAuthHeader() })
+    .then(res => {
+      // If the backend succeeds, update the React UI
+      const updatedCourses = courses.map(sub => 
+        sub.id === selectedSubject.id 
+          ? { ...sub, content: tempContent, videoUrl: tempVideo }
+          : sub
+      );
+      setCourses(updatedCourses);
+      setSelectedSubject({ ...selectedSubject, content: tempContent, videoUrl: tempVideo });
+      
+      alert("✅ Material saved permanently to the database!");
+    })
+    .catch(err => {
+      console.error("Failed to save material:", err);
+      alert("❌ Failed to save material. Please ensure your Spring Boot server is running.");
+    });
+  };
+
+  // --- ADD METHODS (NOW WITH TIMING) ---
   const handleAddCourse = (e) => {
     e.preventDefault();
     setCourseMessage(''); 
@@ -83,7 +126,8 @@ function AdminDashboard() {
       courseCode, 
       courseName, 
       credits: Number(credits), 
-      semester: Number(semester) 
+      semester: Number(semester),
+      classTiming // Sending the new schedule field to backend
     }, { headers: getAuthHeader() })
       .then(() => { 
         fetchCourses(); 
@@ -91,6 +135,7 @@ function AdminDashboard() {
         setCourseName(''); 
         setCredits('3');
         setSemester('1');
+        setClassTiming(''); // Clear input
         setCourseMessage('✅ Subject created successfully!');
         setTimeout(() => setCourseMessage(''), 4000);
       })
@@ -127,6 +172,7 @@ function AdminDashboard() {
         .then(() => {
           setCourseMessage("🗑️ Subject removed.");
           fetchCourses(); 
+          if (selectedSubject && selectedSubject.id === id) setSelectedSubject(null);
           setTimeout(() => setCourseMessage(''), 3000);
         })
         .catch(err => console.error("Delete failed", err));
@@ -250,7 +296,7 @@ function AdminDashboard() {
     });
   };
 
-  // --- FETCH FULL STUDENT DETAILS (Profile, Marks, Attendance) ---
+  // --- FETCH FULL STUDENT DETAILS ---
   const handleViewStudentDetail = async () => {
     if (!viewStudentId) {
       alert('⚠️ Please select a student from the dropdown first.');
@@ -259,7 +305,6 @@ function AdminDashboard() {
     try {
       const headers = getAuthHeader();
       
-      // Fetch Marks and Attendance simultaneously
       const [marksRes, attRes] = await Promise.all([
         axios.get(`http://localhost:8080/api/erp/marks/student/${viewStudentId}`, { headers }).catch(() => ({ data: [] })),
         axios.get(`http://localhost:8080/api/erp/attendance/student/${viewStudentId}`, { headers }).catch(() => ({ data: [] }))
@@ -269,35 +314,131 @@ function AdminDashboard() {
       setViewAttendance(Array.isArray(attRes.data) ? attRes.data : (attRes.data.data || []));
 
       setShowStudentInfo(true);
-      setShowDirectory(false); // Hide the main table to show the detailed view
+      setShowDirectory(false); 
     } catch (error) {
       console.error("Error fetching full student details:", error);
-      alert("Could not fetch academic records. Ensure the backend is running and endpoints exist.");
+      alert("Could not fetch academic records.");
     }
   };
 
-  // --- CSV EXPORT: ALL STUDENTS ---
-  const downloadStudentsCSV = (e) => {
+  // =========================================================================
+  // --- ADVANCED FEATURE: BEAUTIFUL PDF GENERATION ---
+  // =========================================================================
+  
+  const downloadStudentsPDF = (e) => {
     e.preventDefault();
-    let csvContent = "data:text/csv;charset=utf-8,Student ID,Full Name,Roll Number\n";
-    students.forEach(s => csvContent += `${s.id},${s.name},${s.rollNumber}\n`);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "All_Student_Records.csv"); 
-    document.body.appendChild(link); link.click(); document.body.removeChild(link); 
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.setTextColor(0, 122, 255);
+    doc.text("EduCore ERP - Master Student Directory", 14, 20);
+    
+    autoTable(doc, {
+      startY: 30,
+      head: [['Student ID', 'Full Name', 'Roll Number']],
+      body: students.map(s => [s.id, s.name, s.rollNumber]),
+      theme: 'striped',
+      headStyles: { fillColor: [16, 185, 129] }
+    });
+    
+    doc.save("All_Student_Records.pdf");
   };
 
-  // --- CSV EXPORT: INDIVIDUAL STUDENT ---
-  const downloadSingleStudentCSV = (e) => {
+  const downloadSingleStudentPDF = async (e) => {
     e.preventDefault();
     if (!exportStudentId) return alert("Please select a student from the dropdown first!");
+    
     const student = students.find(s => s.id === Number(exportStudentId));
     if (!student) return;
-    let csvContent = `data:text/csv;charset=utf-8,Student ID,Full Name,Roll Number\n${student.id},${student.name},${student.rollNumber}\n`;
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", `${student.name.replace(/\s+/g, '_')}_Record.csv`); 
-    document.body.appendChild(link); link.click(); document.body.removeChild(link); 
+
+    try {
+      const headers = getAuthHeader();
+      
+      const [classesRes, marksRes, attRes, healthRes] = await Promise.all([
+        axios.get(`http://localhost:8080/api/erp/student/${exportStudentId}/classes`, { headers }).catch(() => ({ data: { data: [] } })),
+        axios.get(`http://localhost:8080/api/erp/student/${exportStudentId}/marks`, { headers }).catch(() => ({ data: { data: [] } })),
+        axios.get(`http://localhost:8080/api/erp/attendance/student/${exportStudentId}`, { headers }).catch(() => ({ data: { data: [] } })),
+        axios.get(`http://localhost:8080/api/health/student/${exportStudentId}`, { headers }).catch(() => ({ data: { data: [] } }))
+      ]);
+
+      const studentClasses = Array.isArray(classesRes.data) ? classesRes.data : (classesRes.data.data || []);
+      const studentMarks = Array.isArray(marksRes.data) ? marksRes.data : (marksRes.data.data || []);
+      const studentAtt = Array.isArray(attRes.data) ? attRes.data : (attRes.data.data || []);
+      
+      let studentHealth = Array.isArray(healthRes.data) ? healthRes.data : (healthRes.data.data || []);
+      studentHealth = studentHealth.slice(0, 100); 
+
+      const doc = new jsPDF();
+      
+      doc.setFontSize(22);
+      doc.setTextColor(0, 122, 255); 
+      doc.text("EduCore ERP - Official Student Record", 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 28);
+
+      autoTable(doc, {
+        startY: 35,
+        head: [['Student ID', 'Full Name', 'Roll Number', 'Department', 'Email']],
+        body: [[student.id, student.name, student.rollNumber, student.department || 'N/A', student.email || 'N/A']],
+        theme: 'grid',
+        headStyles: { fillColor: [52, 58, 64] }
+      });
+
+      doc.text("Enrolled Classes", 14, doc.lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [['Course Code', 'Course Name', 'Credits', 'Semester', 'Professor']],
+        body: studentClasses.length > 0 
+          ? studentClasses.map(c => [c.course?.courseCode || 'N/A', c.course?.courseName || 'N/A', c.course?.credits || 0, c.academicSemester || 'N/A', c.faculty?.name || 'N/A'])
+          : [['No classes found', '', '', '', '']],
+        theme: 'striped',
+        headStyles: { fillColor: [0, 122, 255] }
+      });
+
+      doc.text("Academic Performance", 14, doc.lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [['Course', 'Internal (40)', 'Semester (60)', 'Total Score', 'Final Grade']],
+        body: studentMarks.length > 0
+          ? studentMarks.map(m => [m.course?.courseName || 'N/A', m.internalMarks || 0, m.semesterMarks || 0, m.totalMarks || 0, m.grade || 'N/A'])
+          : [['No grades found', '', '', '', '']],
+        theme: 'striped',
+        headStyles: { fillColor: [88, 86, 214] }
+      });
+
+      doc.text("Attendance Record", 14, doc.lastAutoTable.finalY + 15);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 20,
+        head: [['Date', 'Course Code', 'Course Name', 'Status']],
+        body: studentAtt.length > 0
+          ? studentAtt.map(a => [new Date(a.date).toLocaleDateString(), a.course?.courseCode || 'N/A', a.course?.courseName || 'N/A', a.status])
+          : [['No attendance logged', '', '', '']],
+        theme: 'striped',
+        headStyles: { fillColor: [16, 185, 129] }
+      });
+
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(255, 45, 85); 
+      doc.text("IoT Health Telemetry (Latest 100 Readings)", 14, 20);
+
+      autoTable(doc, {
+        startY: 25,
+        head: [['Timestamp', 'Heart Rate', 'SpO2 (%)', 'Body Temp (C)', 'Room Temp (C)', 'Humidity (%)']],
+        body: studentHealth.length > 0
+          ? studentHealth.map(h => [new Date(h.recordedAt).toLocaleString(), `${h.bpm} BPM`, h.spo2, h.bodyTemp, h.roomTemp, h.roomHumidity])
+          : [['No IoT data recorded', '', '', '', '', '']],
+        theme: 'striped',
+        headStyles: { fillColor: [255, 45, 85] }
+      });
+
+      doc.save(`${student.name.replace(/\s+/g, '_')}_Official_Record.pdf`);
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert(`Failed to export PDF: ${error.message}`); 
+    }
   };
 
   return (
@@ -313,7 +454,7 @@ function AdminDashboard() {
           {['courses', 'faculty', 'students', 'enrollment'].map(tab => (
             <button 
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => { setActiveTab(tab); setSelectedSubject(null); }}
               style={{ 
                 padding: '12px 24px', 
                 borderRadius: '14px', 
@@ -338,45 +479,138 @@ function AdminDashboard() {
         {/* 1. COURSES TAB */}
         {activeTab === 'courses' && (
           <div style={{ animation: 'appLaunch 0.4s ease-out' }}>
-            <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f' }}>Add New Subject</h3>
             
-            {courseMessage && (
-              <div style={{ background: courseMessage.includes('✅') ? '#dcfce7' : '#fee2e2', color: courseMessage.includes('✅') || courseMessage.includes('🗑️') ? '#166534' : '#991b1b', padding: '12px 20px', borderRadius: '12px', marginBottom: '20px', fontWeight: '600', fontSize: '14px' }}>
-                {courseMessage}
+            {/* If NO subject is selected -> Show the Normal Grid */}
+            {!selectedSubject ? (
+              <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
+                <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f' }}>Add New Subject</h3>
+                
+                {courseMessage && (
+                  <div style={{ background: courseMessage.includes('✅') ? '#dcfce7' : '#fee2e2', color: courseMessage.includes('✅') || courseMessage.includes('🗑️') ? '#166534' : '#991b1b', padding: '12px 20px', borderRadius: '12px', marginBottom: '20px', fontWeight: '600', fontSize: '14px' }}>
+                    {courseMessage}
+                  </div>
+                )}
+
+                <form onSubmit={handleAddCourse} style={{ display: 'flex', gap: '15px', marginBottom: '30px', background: 'rgba(0,0,0,0.02)', padding: '20px', borderRadius: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <input type="text" placeholder="Code (e.g. CS101)" value={courseCode} onChange={e=>setCourseCode(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '120px' }} required />
+                  <input type="text" placeholder="Subject Name" value={courseName} onChange={e=>setCourseName(e.target.value)} className="custom-input" style={{ flex: 2, minWidth: '180px' }} required />
+                  
+                  {/* NEW TIMING INPUT */}
+                  <input type="text" placeholder="Schedule (e.g. Mon 10AM)" value={classTiming} onChange={e=>setClassTiming(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '160px' }} required />
+
+                  <select value={credits} onChange={e=>setCredits(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '100px', backgroundColor: 'white' }} required>
+                    <option value="1">1 Credit</option>
+                    <option value="2">2 Credits</option>
+                    <option value="3">3 Credits</option>
+                    <option value="4">4 Credits</option>
+                    <option value="5">5 Credits</option>
+                  </select>
+                  <select value={semester} onChange={e=>setSemester(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '120px', backgroundColor: 'white' }} required>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
+                      <option key={sem} value={sem}>Semester {sem}</option>
+                    ))}
+                  </select>
+                  <button type="submit" className="btn btn-add" style={{ padding: '12px 24px', background: '#007aff', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', flex: '0 0 auto' }}>
+                    Add Subject
+                  </button>
+                </form>
+
+                <h3 style={{ fontSize: '18px', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '1px' }}>Available Subjects ({courses.length})</h3>
+                <div className="year-grid">
+                  {courses.map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => openSubjectFolder(c)}
+                      style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', position: 'relative', cursor: 'pointer', transition: 'transform 0.2s', ':hover': { transform: 'scale(1.02)' } }}
+                    >
+                      <button onClick={(e) => { e.stopPropagation(); deleteSubject(c.id); }} style={{ position: 'absolute', top: '15px', right: '15px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px', opacity: 0.7 }}>🗑️</button>
+                      <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#007aff' }}>{c.courseCode}</span>
+                      <div style={{ fontSize: '18px', fontWeight: '700', color: '#1d1d1f', margin: '5px 0', paddingRight: '25px' }}>{c.courseName}</div>
+                      <div style={{ fontSize: '13px', color: '#8e8e93' }}>Sem {c.semester} • {c.credits} Credits</div>
+                      
+                      {/* NEW TIMING DISPLAY */}
+                      <div style={{ fontSize: '13px', color: '#10b981', marginTop: '8px', fontWeight: '600' }}>🕒 {c.classTiming || 'Timing TBA'}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* --- NEW FEATURE: DRILL-DOWN FOLDER VIEW --- */
+              <div style={{ animation: 'appLaunch 0.3s ease-out' }}>
+                
+                {/* Header & Back Button */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginBottom: '25px', paddingBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                  <button 
+                    onClick={() => setSelectedSubject(null)} 
+                    style={{ padding: '8px 16px', borderRadius: '12px', border: '1px solid #e5e7eb', background: 'white', cursor: 'pointer', fontWeight: 'bold', color: '#475569' }}>
+                    ⬅ Back to Subjects
+                  </button>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '24px', color: '#1d1d1f' }}>{selectedSubject.courseName} <span style={{color: '#8e8e93', fontWeight: '500', fontSize: '18px'}}>({selectedSubject.courseCode})</span></h3>
+                    <p style={{ margin: 0, fontSize: '13px', color: '#8e8e93' }}>Manage course materials and video lectures</p>
+                  </div>
+                </div>
+
+                {/* Folder Tabs */}
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                  <button 
+                    onClick={() => setFolderTab('content')}
+                    style={{ flex: 1, padding: '15px', borderRadius: '14px', border: 'none', fontSize: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', background: folderTab === 'content' ? '#007aff' : '#f3f4f6', color: folderTab === 'content' ? 'white' : '#475569' }}>
+                    📄 Subject Content & Notes
+                  </button>
+                  <button 
+                    onClick={() => setFolderTab('videos')}
+                    style={{ flex: 1, padding: '15px', borderRadius: '14px', border: 'none', fontSize: '16px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s', background: folderTab === 'videos' ? '#ff2d55' : '#f3f4f6', color: folderTab === 'videos' ? 'white' : '#475569' }}>
+                    🎥 YouTube Video Lectures
+                  </button>
+                </div>
+
+                {/* Folder 1: Content Workspace */}
+                {folderTab === 'content' && (
+                  <div style={{ background: 'white', padding: '30px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', animation: 'fadeIn 0.3s ease-out' }}>
+                    <h4 style={{ margin: '0 0 15px 0', fontSize: '18px' }}>Syllabus & Study Material</h4>
+                    <p style={{ fontSize: '14px', color: '#8e8e93', marginTop: 0 }}>Add text notes, important instructions, or syllabus details for the students.</p>
+                    <textarea 
+                      value={tempContent}
+                      onChange={(e) => setTempContent(e.target.value)}
+                      placeholder="Paste syllabus or detailed subject notes here..." 
+                      style={{ width: '100%', height: '200px', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: '15px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '15px' }}>
+                      <button onClick={handleSaveMaterial} style={{ background: '#007aff', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 24px', fontWeight: 'bold', cursor: 'pointer' }}>💾 Save Content</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Folder 2: Video Workspace */}
+                {folderTab === 'videos' && (
+                  <div style={{ background: 'white', padding: '30px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 15px rgba(0,0,0,0.02)', animation: 'fadeIn 0.3s ease-out' }}>
+                    <h4 style={{ margin: '0 0 15px 0', fontSize: '18px' }}>Official Video Lecture</h4>
+                    <p style={{ fontSize: '14px', color: '#8e8e93', marginTop: 0 }}>Paste a YouTube link for the primary lecture material.</p>
+                    <input 
+                      type="text" 
+                      value={tempVideo}
+                      onChange={(e) => setTempVideo(e.target.value)}
+                      placeholder="https://youtube.com/watch?v=..." 
+                      style={{ width: '100%', padding: '15px', borderRadius: '12px', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: '15px', outline: 'none', boxSizing: 'border-box' }} 
+                    />
+                    
+                    {/* YouTube Preview box */}
+                    {tempVideo && tempVideo.includes("youtube.com") && (
+                      <div style={{ marginTop: '20px', padding: '15px', background: '#fff1f2', borderRadius: '12px', border: '1px dashed #fda4af', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '24px' }}>📺</span>
+                        <span style={{ color: '#be123c', fontWeight: '600', fontSize: '14px' }}>Valid YouTube Link Detected! Students will be able to click this link in their portal.</span>
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                      <button onClick={handleSaveMaterial} style={{ background: '#ff2d55', color: 'white', border: 'none', borderRadius: '12px', padding: '12px 24px', fontWeight: 'bold', cursor: 'pointer' }}>🔗 Save Video Link</button>
+                    </div>
+                  </div>
+                )}
+
               </div>
             )}
-
-            <form onSubmit={handleAddCourse} style={{ display: 'flex', gap: '15px', marginBottom: '30px', background: 'rgba(0,0,0,0.02)', padding: '20px', borderRadius: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <input type="text" placeholder="Code (e.g. CS101)" value={courseCode} onChange={e=>setCourseCode(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '120px' }} required />
-              <input type="text" placeholder="Subject Name" value={courseName} onChange={e=>setCourseName(e.target.value)} className="custom-input" style={{ flex: 2, minWidth: '200px' }} required />
-              <select value={credits} onChange={e=>setCredits(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '120px', backgroundColor: 'white' }} required>
-                <option value="1">1 Credit</option>
-                <option value="2">2 Credits</option>
-                <option value="3">3 Credits</option>
-                <option value="4">4 Credits</option>
-                <option value="5">5 Credits</option>
-              </select>
-              <select value={semester} onChange={e=>setSemester(e.target.value)} className="custom-input" style={{ flex: 1, minWidth: '120px', backgroundColor: 'white' }} required>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(sem => (
-                  <option key={sem} value={sem}>Semester {sem}</option>
-                ))}
-              </select>
-              <button type="submit" className="btn btn-add" style={{ padding: '12px 24px', background: '#007aff', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer', flex: '0 0 auto' }}>
-                Add Subject
-              </button>
-            </form>
-
-            <h3 style={{ fontSize: '18px', color: '#8e8e93', textTransform: 'uppercase', letterSpacing: '1px' }}>Available Subjects ({courses.length})</h3>
-            <div className="year-grid">
-              {courses.map(c => (
-                <div key={c.id} style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid rgba(0,0,0,0.05)', position: 'relative' }}>
-                  <button onClick={() => deleteSubject(c.id)} style={{ position: 'absolute', top: '15px', right: '15px', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px', opacity: 0.7 }}>🗑️</button>
-                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#007aff' }}>{c.courseCode}</span>
-                  <div style={{ fontSize: '18px', fontWeight: '700', color: '#1d1d1f', margin: '5px 0', paddingRight: '25px' }}>{c.courseName}</div>
-                  <div style={{ fontSize: '13px', color: '#8e8e93' }}>Sem {c.semester} • {c.credits} Credits</div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
 
@@ -450,13 +684,13 @@ function AdminDashboard() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '25px', padding: '20px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#1d1d1f' }}>Student Directory Export</h3>
-                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#8e8e93' }}>Export all enrolled students or a specific student.</p>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: '#1d1d1f' }}>Official Report Generator</h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#8e8e93' }}>Generate formatted PDF documents of student records.</p>
                 </div>
                 <button 
-                  onClick={downloadStudentsCSV} 
+                  onClick={downloadStudentsPDF} 
                   style={{ background: '#10b981', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', transition: 'all 0.2s' }}>
-                  <span>📥</span> Export ALL Students
+                  <span>📄</span> Export ALL Directory (PDF)
                 </button>
               </div>
 
@@ -469,13 +703,13 @@ function AdminDashboard() {
                   className="custom-select" 
                   style={{ flex: 1, borderColor: 'rgba(16, 185, 129, 0.4)', background: 'white' }}
                 >
-                  <option value="">-- Select a specific student to download --</option>
+                  <option value="">-- Select a specific student to generate PDF --</option>
                   {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.rollNumber})</option>)}
                 </select>
                 <button 
-                  onClick={downloadSingleStudentCSV} 
-                  style={{ background: '#059669', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s' }}>
-                  Download Selected
+                  onClick={downloadSingleStudentPDF} 
+                  style={{ background: '#059669', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '10px', fontWeight: 'bold', cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>📄</span> Download A-Z Record (PDF)
                 </button>
               </div>
             </div>

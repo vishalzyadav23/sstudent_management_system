@@ -79,10 +79,10 @@ function Login() {
         <div style={{ position: 'absolute', bottom: '-10%', right: '-10%', width: '300px', height: '300px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%', filter: 'blur(40px)' }}></div>
         
         <h1 style={{ fontSize: '48px', fontWeight: '800', margin: '0 0 15px 0', letterSpacing: '-1px', zIndex: 1 }}>
-          Welcome back.
+          Welcome !
         </h1>
         <p style={{ fontSize: '18px', opacity: 0.9, lineHeight: '1.6', fontWeight: '500', maxWidth: '80%', zIndex: 1 }}>
-          Access your secure dashboard to manage student records, update identities, and monitor academic progress.
+          Access your secure portal to manage academic records, track daily attendance, and monitor real-time physiological health telemetry.
         </p>
       </div>
 
@@ -95,8 +95,8 @@ function Login() {
         flexDirection: 'column', 
         justifyContent: 'center' 
       }}>
-        <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1d1d1f', marginBottom: '8px' }}>System Login</h2>
-        <p style={{ color: '#8e8e93', fontSize: '15px', fontWeight: '500', marginBottom: '30px' }}>Enter your credentials to continue.</p>
+        <h2 style={{ fontSize: '28px', fontWeight: '800', color: '#1d1d1f', marginBottom: '8px' }}>Login Page</h2>
+        <p style={{ color: '#8e8e93', fontSize: '15px', fontWeight: '500', marginBottom: '30px' }}>Please login to your account..</p>
 
         {error && (
           <div style={{ background: '#ffebee', color: '#d32f2f', padding: '12px', borderRadius: '12px', marginBottom: '20px', fontSize: '14px', fontWeight: '600' }}>
@@ -138,7 +138,7 @@ function Login() {
         </form>
 
         <p style={{ textAlign: 'center', marginTop: '30px', color: '#8e8e93', fontSize: '14px', fontWeight: '500' }}>
-          New Student? <Link to="/register" style={{ color: '#007aff', textDecoration: 'none', fontWeight: '700' }}>Create an account</Link>
+          Don't have an account? <Link to="/register" style={{ color: '#007aff', textDecoration: 'none', fontWeight: '700' }}>Create an account</Link>
         </p>
       </div>
 
