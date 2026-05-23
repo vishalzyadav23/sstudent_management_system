@@ -16,6 +16,9 @@ public class Student {
     private String academicYear;
     private String address;
 
+    private String emergencyContactName;
+    private String emergencyContactPhone;
+
     // --- NEW: Added field to store the profile picture ---
     @Column(columnDefinition = "TEXT")
     private String profileImageUrl;
@@ -86,6 +89,22 @@ public class Student {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getEmergencyContactName() {
+        return emergencyContactName;
+    }
+
+    public void setEmergencyContactName(String emergencyContactName) {
+        this.emergencyContactName = emergencyContactName;
+    }
+
+    public String getEmergencyContactPhone() {
+        return emergencyContactPhone;
+    }
+
+    public void setEmergencyContactPhone(String emergencyContactPhone) {
+        this.emergencyContactPhone = emergencyContactPhone;
     }
 
     // --- NEW: Getter and Setter for the profile picture ---

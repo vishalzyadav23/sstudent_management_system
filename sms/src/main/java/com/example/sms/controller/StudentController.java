@@ -80,9 +80,11 @@ public class StudentController {
         Student student = studentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + id));
 
-        // SECURITY: A student can only update these two specific fields!
+        // SECURITY: A student can only update these limited profile fields.
         student.setEmail(studentDetails.getEmail());
         student.setAddress(studentDetails.getAddress());
+        student.setEmergencyContactName(studentDetails.getEmergencyContactName());
+        student.setEmergencyContactPhone(studentDetails.getEmergencyContactPhone());
 
         Student updatedStudent = studentRepository.save(student);
         return new ResponseEntity<>(

@@ -17,6 +17,11 @@ public class HealthRecord {
     private float roomTemp;
     private float roomHumidity;
 
+    private String deviceSource;
+    private String alertStatus;
+    private boolean emergencyEscalated;
+    private String escalationReason;
+
     // This records exactly when the ESP8266 sent the data
     private LocalDateTime recordedAt;
 
@@ -78,6 +83,38 @@ public class HealthRecord {
 
     public void setRoomHumidity(float roomHumidity) {
         this.roomHumidity = roomHumidity;
+    }
+
+    public String getDeviceSource() {
+        return deviceSource;
+    }
+
+    public void setDeviceSource(String deviceSource) {
+        this.deviceSource = deviceSource;
+    }
+
+    public String getAlertStatus() {
+        return alertStatus;
+    }
+
+    public void setAlertStatus(String alertStatus) {
+        this.alertStatus = alertStatus;
+    }
+
+    public boolean isEmergencyEscalated() {
+        return emergencyEscalated;
+    }
+
+    public void setEmergencyEscalated(boolean emergencyEscalated) {
+        this.emergencyEscalated = emergencyEscalated;
+    }
+
+    public String getEscalationReason() {
+        return escalationReason;
+    }
+
+    public void setEscalationReason(String escalationReason) {
+        this.escalationReason = escalationReason;
     }
 
     public LocalDateTime getRecordedAt() {

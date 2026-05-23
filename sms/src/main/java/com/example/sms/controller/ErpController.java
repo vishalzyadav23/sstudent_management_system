@@ -114,6 +114,22 @@ public class ErpController {
         return ResponseEntity.ok(enrollment);
     }
 
+    // --- ENROLLMENT with DATE & TIME ---
+    @PostMapping("/enroll-with-datetime")
+    public ResponseEntity<?> enrollStudentWithDateTime(@RequestBody Map<String, Object> payload) {
+        Long studentId = ((Number) payload.get("studentId")).longValue();
+        Long courseId = ((Number) payload.get("courseId")).longValue();
+        Long facultyId = ((Number) payload.get("facultyId")).longValue();
+        String semester = (String) payload.get("semester");
+        String section = (String) payload.get("section");
+        String assignmentDate = (String) payload.get("assignmentDate");
+        String assignmentTime = (String) payload.get("assignmentTime");
+
+        Enrollment enrollment = enrollmentService.enrollStudent(studentId, courseId, facultyId, semester, section,
+                assignmentDate, assignmentTime);
+        return ResponseEntity.ok(enrollment);
+    }
+
     // ==========================================
     // --- STUDENT PORTAL APIs ---
     // ==========================================

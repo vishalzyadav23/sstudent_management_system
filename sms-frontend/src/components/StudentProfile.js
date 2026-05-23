@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../api'; 
 import { useNavigate } from 'react-router-dom';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ParamedicAssistChat from './ParamedicAssistChat';
 
 function StudentProfile() {
   // --- UI STATES ---
@@ -14,10 +15,17 @@ function StudentProfile() {
   const [marks, setMarks] = useState([]);
   const [attendance, setAttendance] = useState([]); 
   const [healthData, setHealthData] = useState([]); 
+  const [latestHealth, setLatestHealth] = useState(null);
+  const [predictiveData, setPredictiveData] = useState(null);
+  const [healthAlerts, setHealthAlerts] = useState([]);
+  const [medicalDocuments, setMedicalDocuments] = useState([]);
+  const [documentNotes, setDocumentNotes] = useState('');
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [uploadMessage, setUploadMessage] = useState('');
   
   // --- EDIT PROFILE STATES ---
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({ email: '', address: '' });
+  const [formData, setFormData] = useState({ email: '', address: '', emergencyContactName: '', emergencyContactPhone: '' });
   const [profileMessage, setProfileMessage] = useState('');
 
   // --- SECURITY STATES ---
@@ -48,7 +56,12 @@ function StudentProfile() {
         const profileRes = await api.get(`/students/${studentId}`);
         const studentData = profileRes.data.data || profileRes.data; 
         setStudent(studentData);
-        setFormData({ email: studentData.email || '', address: studentData.address || '' });
+        setFormData({
+          email: studentData.email || '',
+          address: studentData.address || '',
+          emergencyContactName: studentData.emergencyContactName || '',
+          emergencyContactPhone: studentData.emergencyContactPhone || ''
+        });
         
         setProfilePic(studentData.profileImageUrl || null);
 
@@ -60,6 +73,9 @@ function StudentProfile() {
 
         const attRes = await api.get(`/erp/student/${studentId}/attendance`);
         setAttendance(attRes.data.data || attRes.data || []);
+
+        const predictiveRes = await api.get(`/ai/student/${studentId}/predictive`);
+        setPredictiveData(predictiveRes.data.data || predictiveRes.data.predictive || predictiveRes.data || null);
 
         setLoading(false);
       } catch (err) {
@@ -73,30 +89,54 @@ function StudentProfile() {
 
   // --- LIVE IOT HEALTH DATA POLLING ---
   useEffect(() => {
-    if (activeTab !== "health") return; 
+    if (activeTab !== "health") return;
 
     const fetchHealthData = async () => {
       try {
         const res = await api.get(`/health/student/${studentId}`);
         let data = res.data.data || res.data || [];
-        
-        data = data.slice(0, 20).reverse(); 
-        
+        data = data.slice(0, 20).reverse();
+
         const formattedData = data.map(record => ({
           ...record,
           timeLabel: new Date(record.recordedAt).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second:'2-digit' })
         }));
 
         setHealthData(formattedData);
+        setLatestHealth(formattedData.length > 0 ? formattedData[formattedData.length - 1] : null);
       } catch (err) {
         console.error("Error fetching health data", err);
       }
     };
 
-    fetchHealthData(); 
-    const interval = setInterval(fetchHealthData, 2000);
+    const fetchHealthAlerts = async () => {
+      try {
+        const res = await api.get(`/health/student/${studentId}/alerts`);
+        setHealthAlerts(res.data.data || res.data || []);
+      } catch (err) {
+        console.error("Error fetching health alerts", err);
+      }
+    };
 
-    return () => clearInterval(interval); 
+    const fetchMedicalDocuments = async () => {
+      try {
+        const res = await api.get(`/health/student/${studentId}/documents`);
+        setMedicalDocuments(res.data.data || res.data || []);
+      } catch (err) {
+        console.error("Error fetching medical documents", err);
+      }
+    };
+
+    fetchHealthData();
+    fetchHealthAlerts();
+    fetchMedicalDocuments();
+
+    const interval = setInterval(() => {
+      fetchHealthData();
+      fetchHealthAlerts();
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [activeTab, studentId]);
 
   // --- Logic: Update Profile (Email/Address) ---
@@ -151,6 +191,38 @@ function StudentProfile() {
         }
       };
       reader.readAsDataURL(file); 
+    }
+  };
+
+  const handleDocumentChange = (e) => {
+    setSelectedDocument(e.target.files[0] || null);
+  };
+
+  const handleDocumentUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedDocument) {
+      setUploadMessage('Please choose a medical document first.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', selectedDocument);
+    if (documentNotes) {
+      formData.append('notes', documentNotes);
+    }
+
+    try {
+      await api.post(`/health/student/${studentId}/documents`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setUploadMessage('Document uploaded successfully.');
+      setSelectedDocument(null);
+      setDocumentNotes('');
+      const docsRes = await api.get(`/health/student/${studentId}/documents`);
+      setMedicalDocuments(docsRes.data.data || docsRes.data || []);
+    } catch (error) {
+      console.error('Upload failed:', error);
+      setUploadMessage('Upload failed. Please try again.');
     }
   };
 
@@ -242,8 +314,103 @@ function StudentProfile() {
 
             </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+              <div style={{ background: '#ffffff', padding: '22px', borderRadius: '22px', boxShadow: '0 14px 30px rgba(0,0,0,0.05)', borderLeft: '5px solid #ff2d55' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#6366f1', marginBottom: '10px' }}>Health Risk</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: '#1f2937' }}>{predictiveData?.healthTrend?.healthRiskLabel || 'Loading...'}</div>
+                <div style={{ marginTop: '8px', color: '#475569', fontSize: '14px' }}>{predictiveData?.healthTrend?.healthRiskSummary || 'Assessing recent vitals to understand potential risk.'}</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '22px', borderRadius: '22px', boxShadow: '0 14px 30px rgba(0,0,0,0.05)', borderLeft: '5px solid #34d399' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#10b981', marginBottom: '10px' }}>Attendance Forecast</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: '#1f2937' }}>{predictiveData?.attendanceProjection?.attendanceRiskLabel || 'Loading...'}</div>
+                <div style={{ marginTop: '8px', color: '#475569', fontSize: '14px' }}>{predictiveData?.attendanceProjection?.attendanceProjectionSummary || 'Checking attendance history and forecasted impact.'}</div>
+              </div>
+              <div style={{ background: '#ffffff', padding: '22px', borderRadius: '22px', boxShadow: '0 14px 30px rgba(0,0,0,0.05)', borderLeft: '5px solid #7c3aed' }}>
+                <div style={{ fontSize: '12px', letterSpacing: '0.18em', textTransform: 'uppercase', color: '#7c3aed', marginBottom: '10px' }}>Academic Guidance</div>
+                <div style={{ fontSize: '32px', fontWeight: '800', color: '#1f2937' }}>{predictiveData?.academicAdvisor?.academicTrendLabel || 'Loading...'}</div>
+                <div style={{ marginTop: '8px', color: '#475569', fontSize: '14px' }}>{predictiveData?.academicAdvisor?.academicAdvisorNotes || 'Synthesizing course performance and tutor advice.'}</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px', marginBottom: '20px' }}>
+              <div style={{ background: '#f8fafc', padding: '22px', borderRadius: '22px', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>Emergency Timeline</h4>
+                  <span style={{ fontSize: '13px', color: '#334155', fontWeight: '600' }}>{healthAlerts.length} alerts</span>
+                </div>
+                {healthAlerts.length === 0 ? (
+                  <div style={{ color: '#64748b', marginTop: '16px', lineHeight: '1.7' }}>No escalations have been recorded yet. Your wearable sensor data is being monitored continuously.</div>
+                ) : (
+                  healthAlerts.map(alert => (
+                    <div key={alert.id} style={{ marginTop: '16px', padding: '16px', borderRadius: '18px', background: '#ffffff', border: '1px solid rgba(99, 102, 241, 0.12)' }}>
+                      <div style={{ fontSize: '14px', color: '#334155', fontWeight: '700' }}>{alert.severity} alert</div>
+                      <div style={{ marginTop: '6px', color: '#475569', fontSize: '14px' }}>{alert.message}</div>
+                      <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <span style={{ color: '#64748b', fontSize: '12px' }}>{new Date(alert.createdAt).toLocaleString()}</span>
+                        <span style={{ color: alert.severity === 'Critical' ? '#b91c1c' : '#d97706', fontSize: '12px', fontWeight: '600' }}>{alert.emailSent ? 'Nurse/Admin alerted' : 'Pending notification'}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '22px', borderRadius: '22px', border: '1px solid rgba(15, 23, 42, 0.08)' }}>
+                <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1f2937' }}>Medical Record Uploads</h4>
+                <p style={{ margin: '10px 0 14px', color: '#64748b', fontSize: '14px' }}>Attach prescriptions, scan reports, or physician notes for review.</p>
+                <div style={{ display: 'grid', gap: '14px' }}>
+                  <input type="file" accept="application/pdf,image/*" onChange={handleDocumentChange} />
+                  <textarea
+                    rows="3"
+                    value={documentNotes}
+                    onChange={(e) => setDocumentNotes(e.target.value)}
+                    placeholder="Add optional notes for the document"
+                    style={{ width: '100%', padding: '12px', borderRadius: '14px', border: '1px solid rgba(148, 163, 184, 0.4)', background: 'white' }}
+                  />
+                  <button onClick={handleDocumentUpload} className="btn btn-add" style={{ width: '100%' }}>Upload Document</button>
+                  {uploadMessage && <div style={{ color: '#334155', fontSize: '13px', fontWeight: '600' }}>{uploadMessage}</div>}
+                </div>
+                {medicalDocuments.length > 0 && (
+                  <div style={{ marginTop: '18px', display: 'grid', gap: '12px' }}>
+                    {medicalDocuments.map(doc => (
+                      <div key={doc.id} style={{ padding: '14px', borderRadius: '16px', background: 'white', border: '1px solid rgba(148, 163, 184, 0.2)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>{doc.fileName}</div>
+                            <div style={{ fontSize: '12px', color: '#475569' }}>{doc.notes || 'No description provided'}</div>
+                          </div>
+                          <a
+                            href={`data:${doc.contentType};base64,${doc.fileData}`}
+                            download={doc.fileName}
+                            style={{ color: '#2563eb', fontSize: '12px', fontWeight: '700' }}
+                          >
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div style={{ background: "white", padding: "30px", borderRadius: "24px", boxShadow: "0 10px 40px rgba(0,0,0,0.05)" }}>
               <h3 style={{ margin: "0 0 20px 0", color: "#1d1d1f" }}>Real-Time Physiological Telemetry</h3>
+              {latestHealth ? (
+                <div style={{ marginBottom: '18px', display: 'grid', gap: '10px' }}>
+                  <div style={{ color: '#475569', fontSize: '14px' }}>
+                    Latest update: <strong>{latestHealth.timeLabel}</strong>
+                  </div>
+                  <div style={{ color: '#0f766e', fontSize: '14px' }}>
+                    Health status: <strong>{latestHealth.spo2 < 94 || latestHealth.bpm > 100 || latestHealth.bodyTemp > 37.5 ? 'Review required' : 'Stable'}</strong>
+                  </div>
+                  <div style={{ color: '#334155', fontSize: '14px' }}>
+                    Sensor source: <strong>{latestHealth.deviceSource || 'Campus health sensor'}</strong>
+                  </div>
+                  <div style={{ color: '#334155', fontSize: '14px' }}>
+                    Emergency contact: <strong>{student.emergencyContactName || student.name}</strong> / <strong>{student.emergencyContactPhone || student.phoneNumber}</strong>
+                  </div>
+                </div>
+              ) : null}
               {healthData.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px", color: "#8e8e93" }}>Waiting for Edge Device connection...</div>
               ) : (
@@ -263,6 +430,9 @@ function StudentProfile() {
                 </div>
               )}
             </div>
+
+            {/* PARAMEDIC ASSIST CHAT */}
+            <ParamedicAssistChat student={student} healthData={healthData} latestReading={latestHealth} />
           </div>
         )}
 
@@ -313,6 +483,16 @@ function StudentProfile() {
                 <div style={{ marginBottom: '15px' }}>
                   <label style={{ display: 'block', fontSize: '11px', color: '#8e8e93', fontWeight: '800', marginBottom: '6px', marginLeft: '4px' }}>EMAIL ADDRESS</label>
                   <input className="custom-input" type="email" value={formData.email} disabled={!isEditing} onChange={(e) => setFormData({...formData, email: e.target.value})} style={{ width: '100%', boxSizing: 'border-box', background: isEditing ? 'white' : 'rgba(0,0,0,0.03)', border: isEditing ? '1px solid #007aff' : 'none' }} />
+                </div>
+                <div style={{ display: 'grid', gap: '15px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#8e8e93', fontWeight: '800', marginBottom: '6px', marginLeft: '4px' }}>EMERGENCY CONTACT NAME</label>
+                    <input className="custom-input" type="text" value={formData.emergencyContactName} disabled={!isEditing} onChange={(e) => setFormData({...formData, emergencyContactName: e.target.value})} style={{ width: '100%', boxSizing: 'border-box', background: isEditing ? 'white' : 'rgba(0,0,0,0.03)', border: isEditing ? '1px solid #007aff' : 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', color: '#8e8e93', fontWeight: '800', marginBottom: '6px', marginLeft: '4px' }}>EMERGENCY CONTACT PHONE</label>
+                    <input className="custom-input" type="tel" value={formData.emergencyContactPhone} disabled={!isEditing} onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})} style={{ width: '100%', boxSizing: 'border-box', background: isEditing ? 'white' : 'rgba(0,0,0,0.03)', border: isEditing ? '1px solid #007aff' : 'none' }} />
+                  </div>
                 </div>
                 <div style={{ marginBottom: '25px' }}>
                   <label style={{ display: 'block', fontSize: '11px', color: '#8e8e93', fontWeight: '800', marginBottom: '6px', marginLeft: '4px' }}>RESIDENTIAL ADDRESS</label>
@@ -372,6 +552,24 @@ function StudentProfile() {
                     ))}
                   </div>
                 )}
+
+                  {/* NEW: ASSIGNMENT DATE & TIME DISPLAY */}
+                  {classes.length > 0 && (
+                    <div style={{ marginTop: '25px', padding: '20px', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '16px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                      <h4 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#10b981', fontWeight: '600' }}>📅 Upcoming Class Assignments</h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px' }}>
+                        {classes.filter(enroll => enroll.assignmentDate).map(enroll => (
+                          <div key={enroll.id} style={{ flex: '1 1 250px', background: 'white', padding: '15px', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.3)', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.1)' }}>
+                            <div style={{ fontSize: '13px', fontWeight: '600', color: '#10b981' }}>{enroll.course?.courseCode}</div>
+                            <div style={{ fontSize: '14px', fontWeight: '600', color: '#1d1d1f', marginTop: '5px' }}>{enroll.course?.courseName}</div>
+                            <div style={{ fontSize: '12px', color: '#8e8e93', marginTop: '8px' }}>
+                              📅 {new Date(enroll.assignmentDate).toLocaleDateString()} at 🕒 {enroll.assignmentTime || 'TBA'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
               </>
             ) : (
               /* IF CLASS IS SELECTED -> SHOW LEARNING PORTAL */

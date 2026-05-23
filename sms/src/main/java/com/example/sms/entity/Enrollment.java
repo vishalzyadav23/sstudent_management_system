@@ -24,6 +24,10 @@ public class Enrollment {
     private String academicSemester; // e.g., "Spring 2026"
     private String section; // e.g., "A", "B"
 
+    // --- NEW: ASSIGNMENT DATE & TIME ---
+    private String assignmentDate; // e.g., "2026-05-22" (YYYY-MM-DD format)
+    private String assignmentTime; // e.g., "10:30 AM" (HH:MM AM/PM format)
+
     // Add standard Getters and Setters here
     public Long getId() {
         return id;
@@ -71,5 +75,21 @@ public class Enrollment {
 
     public void setSection(String section) {
         this.section = section;
+    }
+
+    public String getAssignmentDate() {
+        return assignmentDate;
+    }
+
+    public void setAssignmentDate(String assignmentDate) {
+        this.assignmentDate = assignmentDate;
+    }
+
+    public String getAssignmentTime() {
+        return assignmentTime;
+    }
+
+    public void setAssignmentTime(String assignmentTime) {
+        this.assignmentTime = assignmentTime;
     }
 }

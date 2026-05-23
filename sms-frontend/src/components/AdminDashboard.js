@@ -40,6 +40,8 @@ function AdminDashboard() {
   const [enrollSemester, setEnrollSemester] = useState('Fall 2026');
   const [enrollSection, setEnrollSection] = useState('A');
   const [enrollMessage, setEnrollMessage] = useState('');
+    const [enrollAssignmentDate, setEnrollAssignmentDate] = useState(new Date().toISOString().split('T')[0]);
+    const [enrollAssignmentTime, setEnrollAssignmentTime] = useState('09:00');
 
   // --- STATES FOR ACADEMIC RECORDS ---
   const [recordStudentId, setRecordStudentId] = useState('');
@@ -214,6 +216,34 @@ function AdminDashboard() {
       console.error(err);
     });
   };
+
+    // --- ENROLLMENT WITH DATE & TIME METHOD ---
+    const handleEnrollmentWithDateTime = (e) => {
+      e.preventDefault();
+      setEnrollMessage('');
+    
+      axios.post('http://localhost:8080/api/erp/enroll-with-datetime', {
+        studentId: Number(enrollStudentId),
+        courseId: Number(enrollCourseId),
+        facultyId: Number(enrollFacultyId),
+        semester: enrollSemester,
+        section: enrollSection,
+        assignmentDate: enrollAssignmentDate,
+        assignmentTime: enrollAssignmentTime
+      }, { headers: getAuthHeader() })
+      .then(() => {
+        setEnrollMessage(`✅ Student successfully enrolled! Assignment Date: ${enrollAssignmentDate} at ${enrollAssignmentTime}`);
+        setTimeout(() => setEnrollMessage(''), 4000);
+        setEnrollStudentId('');
+        setEnrollAssignmentDate(new Date().toISOString().split('T')[0]);
+        setEnrollAssignmentTime('09:00');
+      })
+      .catch(err => {
+        const errorMessage = err.response?.data?.message || err.message || "Failed to enroll student.";
+        setEnrollMessage(`❌ Error: ${errorMessage}`);
+        console.error(err);
+      });
+    };
 
   // --- BULK GRADE ENTRY LOGIC ---
   const handleBulkMarkChange = (courseId, field, value) => {
@@ -845,18 +875,18 @@ function AdminDashboard() {
             
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '30px' }}>
               
-              {/* CARD 1: Class Assignments */}
-              <div style={{ flex: '1 1 300px', background: 'rgba(0,0,0,0.02)', padding: '30px', borderRadius: '20px', border: '1px solid rgba(0,0,0,0.05)' }}>
-                <h3 style={{ marginTop: 0, fontSize: '22px', color: '#1d1d1f' }}>1. Class Assignments</h3>
-                <p style={{ color: '#8e8e93', marginBottom: '25px', fontSize: '14px' }}>Link a student to a course and professor.</p>
+              {/* CARD 1: Class Assignments WITH DATE & TIME */}
+              <div style={{ flex: '1 1 300px', background: 'rgba(16, 185, 129, 0.05)', padding: '30px', borderRadius: '20px', border: '2px solid rgba(16, 185, 129, 0.3)' }}>
+                <h3 style={{ marginTop: 0, fontSize: '22px', color: '#10b981' }}>1. Class Assignments</h3>
+                <p style={{ color: '#8e8e93', marginBottom: '25px', fontSize: '14px' }}>Assign class with scheduled date and time.</p>
                 
-                {enrollMessage && (
+                  {enrollMessage && (
                   <div style={{ background: enrollMessage.includes('✅') ? '#dcfce7' : '#fee2e2', color: enrollMessage.includes('✅') ? '#166534' : '#991b1b', padding: '10px 15px', borderRadius: '10px', marginBottom: '15px', fontWeight: '600', fontSize: '13px' }}>
                     {enrollMessage}
                   </div>
                 )}
 
-                <form onSubmit={handleEnrollment} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <form onSubmit={handleEnrollmentWithDateTime} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   <select value={enrollStudentId} onChange={e=>setEnrollStudentId(e.target.value)} className="custom-select" required>
                     <option value="" disabled>-- Select Student --</option>
                     {students.map(s => <option key={s.id} value={s.id}>{s.name} ({s.rollNumber})</option>)}
@@ -873,7 +903,16 @@ function AdminDashboard() {
                     <input type="text" placeholder="Semester (e.g. Fall 2026)" value={enrollSemester} onChange={e=>setEnrollSemester(e.target.value)} className="custom-input" style={{ flex: '1 1 120px' }} required />
                     <input type="text" placeholder="Section (e.g. A)" value={enrollSection} onChange={e=>setEnrollSection(e.target.value)} className="custom-input" style={{ flex: '1 1 120px' }} required />
                   </div>
-                  <button type="submit" className="btn btn-add" style={{ padding: '14px', marginTop: '5px' }}>🔗 Finalize</button>
+                  
+                  {/* DATE & TIME FIELDS */}
+                  <hr style={{ border: 'none', borderTop: '1px dashed #cbd5e1', margin: '10px 0' }} />
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>📅 Assignment Date</label>
+                  <input type="date" value={enrollAssignmentDate} onChange={e=>setEnrollAssignmentDate(e.target.value)} className="custom-input" required />
+                  
+                  <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>🕒 Assignment Time</label>
+                  <input type="time" value={enrollAssignmentTime} onChange={e=>setEnrollAssignmentTime(e.target.value)} className="custom-input" required />
+                  
+                  <button type="submit" className="btn btn-add" style={{ padding: '14px', marginTop: '10px', background: '#10b981' }}>🔗 Finalize with Date & Time</button>
                 </form>
               </div>
 

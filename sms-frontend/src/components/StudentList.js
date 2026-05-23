@@ -220,18 +220,18 @@ function StudentList() {
 
             return (
               <tr key={student.id}>
-                <td style={{ color: '#64748b', fontWeight: '600' }}>#{student.id}</td>
-                <td>
+                <td data-label="ID" style={{ color: '#64748b', fontWeight: '600' }}>#{student.id}</td>
+                <td data-label="Name">
                   <div style={{ fontWeight: '700', color: '#0f172a' }}>{student.name}</div>
                   <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{student.address}</div>
                 </td>
-                <td style={{ fontWeight: '600', color: '#475569' }}>{student.rollNumber}</td>
-                <td style={{ color: '#64748b' }}>{student.email}</td>
-                <td>
+                <td data-label="Roll No." style={{ fontWeight: '600', color: '#475569' }}>{student.rollNumber}</td>
+                <td data-label="Email" style={{ color: '#64748b' }}>{student.email}</td>
+                <td data-label="Department">
                   <span className={`dept-badge ${badgeClass}`}>{student.department}</span>
                 </td>
-                <td style={{ fontWeight: '600', color: '#475569' }}>{student.academicYear}</td>
-                <td style={{ textAlign: 'right' }}>
+                <td data-label="Year" style={{ fontWeight: '600', color: '#475569' }}>{student.academicYear}</td>
+                <td data-label="Actions" style={{ textAlign: 'right' }}>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                     <Link to={`/edit/${student.id}`}>
                       <button className="btn btn-edit">Edit</button>

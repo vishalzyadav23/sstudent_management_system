@@ -34,4 +34,15 @@ public class EmailService {
         mailSender.send(message);
         System.out.println("✅ SUCCESS: Email handed off to Google SMTP for " + toEmail);
     }
+
+    public void sendHealthAlertEmail(String[] toEmails, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(senderEmail);
+        message.setTo(toEmails);
+        message.setSubject(subject);
+        message.setText(body);
+
+        mailSender.send(message);
+        System.out.println("✅ SUCCESS: Health alert email sent to " + String.join(", ", toEmails));
+    }
 }

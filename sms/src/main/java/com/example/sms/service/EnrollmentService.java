@@ -49,6 +49,32 @@ public class EnrollmentService {
         return enrollmentRepo.save(enrollment);
     }
 
+    @Transactional
+    public Enrollment enrollStudent(Long studentId, Long courseId, Long facultyId, String semester, String section,
+            String assignmentDate, String assignmentTime) {
+
+        // 1. Verify everything exists
+        Student student = studentRepo.findById(studentId)
+                .orElseThrow(() -> new RuntimeException("Student not found!"));
+        Course course = courseRepo.findById(courseId)
+                .orElseThrow(() -> new RuntimeException("Course not found!"));
+        Faculty faculty = facultyRepo.findById(facultyId)
+                .orElseThrow(() -> new RuntimeException("Faculty not found!"));
+
+        // 2. Create the Enrollment Bridge
+        Enrollment enrollment = new Enrollment();
+        enrollment.setStudent(student);
+        enrollment.setCourse(course);
+        enrollment.setFaculty(faculty);
+        enrollment.setAcademicSemester(semester);
+        enrollment.setSection(section);
+        enrollment.setAssignmentDate(assignmentDate);
+        enrollment.setAssignmentTime(assignmentTime);
+
+        // 3. Save it to the database
+        return enrollmentRepo.save(enrollment);
+    }
+
     // Get all classes for a specific student (For the Student Dashboard)
     public List<Enrollment> getClassesForStudent(Long studentId) {
         return enrollmentRepo.findByStudentId(studentId);
